@@ -1196,15 +1196,16 @@ class ClaudeConfigSwitcher:
         ]
 
     def test_config(self, base_url: str, auth_token: str, model: str) -> tuple[bool, str]:
-        """Test if a configuration is valid by making a test API call"""
+        """Test if a configuration is valid by making a test API call - Full Claude Code CLI compatibility"""
         try:
+            # Use exact Claude Code CLI headers from actual implementation
             headers = {
-                "Content-Type": "application/json",
+                "content-type": "application/json",
                 "anthropic-version": "2023-06-01",
                 "x-api-key": auth_token,
-                "User-Agent": "claude-cli/1.0.115 (external, cli)",
-                "Accept": "application/json, text/plain, */*",
-                "Accept-Encoding": "gzip, compress, deflate, br"
+                "user-agent": "claude-cli/1.0.115 (external, cli)",
+                "accept": "application/json, text/plain, */*",
+                "accept-encoding": "gzip, deflate, br"
             }
 
             data = {
@@ -1215,13 +1216,17 @@ class ClaudeConfigSwitcher:
 
             url = f"{base_url.rstrip('/')}/v1/messages"
 
-            # Debug output for troubleshooting
-            print(f"Config Test Debug:")
-            print(f"URL: {url}")
-            print(f"Headers: {headers}")
-            print(f"Data: {data}")
+            # Use requests.Session for better connection handling like Claude Code
+            session = requests.Session()
+            session.headers.update(headers)
 
-            response = requests.post(url, headers=headers, json=data, timeout=10)
+            # Remove debug output for normal operation
+            # print(f"Config Test Debug:")
+            # print(f"URL: {url}")
+            # print(f"Headers: {dict(session.headers)}")
+            # print(f"Data: {data}")
+
+            response = session.post(url, json=data, timeout=10)
 
             print(f"Response Status: {response.status_code}")
             print(f"Response Text: {response.text}")
@@ -1243,15 +1248,16 @@ class ClaudeConfigSwitcher:
             return False, f"测试失败: {str(e)}"
 
     def test_api_call(self, base_url: str, auth_token: str, model: str, question: str = "1+2=？") -> tuple[bool, str, dict]:
-        """Test actual API call with a specific question"""
+        """Test actual API call with a specific question - Full Claude Code CLI compatibility"""
         try:
+            # Use exact Claude Code CLI headers from actual implementation
             headers = {
-                "Content-Type": "application/json",
+                "content-type": "application/json",
                 "anthropic-version": "2023-06-01",
                 "x-api-key": auth_token,
-                "User-Agent": "claude-cli/1.0.115 (external, cli)",
-                "Accept": "application/json, text/plain, */*",
-                "Accept-Encoding": "gzip, compress, deflate, br"
+                "user-agent": "claude-cli/1.0.115 (external, cli)",
+                "accept": "application/json, text/plain, */*",
+                "accept-encoding": "gzip, deflate, br"
             }
 
             data = {
@@ -1262,13 +1268,17 @@ class ClaudeConfigSwitcher:
 
             url = f"{base_url.rstrip('/')}/v1/messages"
 
-            # Debug output for troubleshooting
-            print(f"API Test Debug:")
-            print(f"URL: {url}")
-            print(f"Headers: {headers}")
-            print(f"Data: {data}")
+            # Use requests.Session for better connection handling like Claude Code
+            session = requests.Session()
+            session.headers.update(headers)
 
-            response = requests.post(url, headers=headers, json=data, timeout=30)
+            # Remove debug output for normal operation
+            # print(f"API Test Debug:")
+            # print(f"URL: {url}")
+            # print(f"Headers: {dict(session.headers)}")
+            # print(f"Data: {data}")
+
+            response = session.post(url, json=data, timeout=30)
 
             print(f"Response Status: {response.status_code}")
             print(f"Response Headers: {dict(response.headers)}")
@@ -1593,7 +1603,7 @@ class APITestDialog:
             success, message, result_data = self.parent.test_api_call(
                 selected_config["ANTHROPIC_BASE_URL"],
                 selected_config["ANTHROPIC_AUTH_TOKEN"],
-                selected_config["default_model"],
+                selected_config["default_model"],  # Use model from selected config
                 question
             )
 
@@ -1729,9 +1739,24 @@ class ConfigManagerDialog:
         )
         list_title.pack(side="left")
 
-        # Add button
+        # Add and Batch Test buttons
+        buttons_frame = ctk.CTkFrame(list_header, fg_color="transparent")
+        buttons_frame.pack(side="right")
+
+        self.batch_test_btn = ctk.CTkButton(
+            buttons_frame,
+            text="批量测试",
+            command=self.batch_test_configs,
+            width=75,
+            height=25,
+            font=self.get_font(size=11),
+            fg_color=COLORS["warning_orange"],
+            hover_color="#e68900"
+        )
+        self.batch_test_btn.pack(side="right", padx=(0, 5))
+
         self.add_btn = ctk.CTkButton(
-            list_header,
+            buttons_frame,
             text="+ 添加",
             command=self.add_config,
             width=60,
@@ -1967,7 +1992,14 @@ class ConfigManagerDialog:
 
         self.clear_form()
 
+    def open_api_test(self):
+        """Open API test dialog from config manager"""
+        APITestDialog(self.parent)
+
     def refresh_config_list(self):
+        self.refresh_config_list_with_selection(None)
+
+    def refresh_config_list_with_selection(self, selected_name):
         # Clear existing items
         for widget in self.config_list.winfo_children():
             widget.destroy()
@@ -1976,58 +2008,87 @@ class ConfigManagerDialog:
         for config in self.parent.configs_data["configs"]:
             self.create_config_item(config)
 
+        # Restore selection if specified
+        if selected_name:
+            for widget in self.config_list.winfo_children():
+                if hasattr(widget, '_config_data') and widget._config_data["name"] == selected_name:
+                    self.select_config(widget._config_data)
+                    break
+
     def create_config_item(self, config):
+        # Simple item with just name and minimal status
         item_frame = ctk.CTkFrame(self.config_list, fg_color=COLORS["bg_primary"])
-        item_frame.pack(fill="x", pady=2, padx=2)
+        item_frame.pack(fill="x", pady=1, padx=2)
 
-        # Config info
-        info_frame = ctk.CTkFrame(item_frame, fg_color="transparent")
-        info_frame.pack(fill="x", padx=10, pady=8)
+        # Main content frame - compact layout
+        content_frame = ctk.CTkFrame(item_frame, fg_color="transparent")
+        content_frame.pack(fill="x", padx=8, pady=6)
 
-        # Name and active indicator
-        header_frame = ctk.CTkFrame(info_frame, fg_color="transparent")
-        header_frame.pack(fill="x")
-
+        # Name label
         name_label = ctk.CTkLabel(
-            header_frame,
+            content_frame,
             text=config["name"],
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            font=self.get_font(size=12),
             text_color=COLORS["text_primary"],
             anchor="w"
         )
         name_label.pack(side="left")
 
-        # Active indicator
-        if config["name"] == self.parent.configs_data.get("active_config"):
-            active_label = ctk.CTkLabel(
-                header_frame,
-                text="活跃",
-                font=self.get_font(size=10, weight="bold"),
-                text_color="white",
-                fg_color=COLORS["success_green"],
-                corner_radius=3
-            )
-            active_label.pack(side="right", padx=(0, 5))
+        # Status indicators on the right - compact
+        status_container = ctk.CTkFrame(content_frame, fg_color="transparent")
+        status_container.pack(side="right")
 
-        # Model info
-        model_label = ctk.CTkLabel(
-            info_frame,
-            text=f"模型: {config['default_model']}",
-            font=self.get_font(size=11),
-            text_color=COLORS["text_secondary"],
-            anchor="w"
-        )
-        model_label.pack(fill="x", pady=(5, 0))
+        # Test status (simple colored circle)
+        test_status = config.get('test_status', None)
+        if test_status == 'success':
+            status_circle = ctk.CTkLabel(
+                status_container,
+                text="●",
+                font=self.get_font(size=14),
+                text_color=COLORS["success_green"]
+            )
+            status_circle.pack(side="right", padx=(0, 3))
+        elif test_status == 'failed':
+            status_circle = ctk.CTkLabel(
+                status_container,
+                text="●",
+                font=self.get_font(size=14),
+                text_color=COLORS["accent_red"]
+            )
+            status_circle.pack(side="right", padx=(0, 3))
+        elif test_status == 'testing':
+            status_circle = ctk.CTkLabel(
+                status_container,
+                text="●",
+                font=self.get_font(size=14),
+                text_color=COLORS["warning_orange"]
+            )
+            status_circle.pack(side="right", padx=(0, 3))
+
+        # Active indicator (small text)
+        if config["name"] == self.parent.configs_data.get("active_config"):
+            active_text = ctk.CTkLabel(
+                status_container,
+                text="活跃",
+                font=self.get_font(size=9),
+                text_color=COLORS["success_green"],
+                fg_color=COLORS["bg_primary"]
+            )
+            active_text.pack(side="right", padx=(0, 5))
 
         # Click binding
         def on_click(event, cfg=config):
             self.select_config(cfg)
 
-        for widget in [item_frame, info_frame, header_frame, name_label, model_label]:
+        # Bind click to all widgets
+        for widget in [item_frame, content_frame, name_label]:
             widget.bind("<Button-1>", on_click)
+            if status_container in locals():
+                status_container.bind("<Button-1>", on_click)
 
         # Store reference for selection highlighting
         item_frame._config_data = config
+        item_frame._is_selected = False
 
     def select_config(self, config):
         self.selected_config = config
@@ -2054,8 +2115,10 @@ class ConfigManagerDialog:
             if hasattr(widget, '_config_data'):
                 if widget._config_data["name"] == config["name"]:
                     widget.configure(fg_color=COLORS["accent_primary"])
+                    widget._is_selected = True
                 else:
                     widget.configure(fg_color=COLORS["bg_primary"])
+                    widget._is_selected = False
 
     def clear_form(self):
         self.selected_config = None
@@ -2172,15 +2235,73 @@ class ConfigManagerDialog:
     def test_complete(self, success, message):
         self.test_btn.configure(text="测试配置", state="normal")
         color = COLORS["success_green"] if success else COLORS["accent_red"]
-        self.show_status(f"测试结果: {message}", color)
+        self.show_status(f"测试结果: {message}", color, permanent=True)  # 永久显示测试结果
 
-    def show_status(self, message, color):
+    def show_status(self, message, color, permanent=False):
         self.status_label.configure(text=message, text_color=color)
-        # Clear after 5 seconds
-        self.dialog.after(5000, lambda: self.status_label.configure(text=""))
+        # Only clear after 5 seconds if not permanent
+        if not permanent:
+            self.dialog.after(5000, lambda: self.status_label.configure(text=""))
 
     def close_dialog(self):
         self.dialog.destroy()
+
+    def batch_test_configs(self):
+        """批量测试所有配置"""
+        configs = self.parent.configs_data["configs"]
+        if not configs:
+            self.show_status("没有配置可供测试", COLORS["accent_red"])
+            return
+
+        self.batch_test_btn.configure(text="测试中...", state="disabled")
+        self.show_status("开始批量测试...", COLORS["text_muted"])
+
+        # Reset all test statuses
+        for config in configs:
+            config['test_status'] = 'testing'
+
+        self.refresh_config_list()
+
+        # Run batch test in background
+        import threading
+
+        def run_batch_test():
+            # Store current selection
+            selected_name = self.selected_config["name"] if self.selected_config else None
+
+            for i, config in enumerate(configs):
+                try:
+                    success, message = self.parent.test_config(
+                        config["ANTHROPIC_BASE_URL"],
+                        config["ANTHROPIC_AUTH_TOKEN"],
+                        config["default_model"]
+                    )
+                    config['test_status'] = 'success' if success else 'failed'
+                    config['test_message'] = message
+                except Exception as e:
+                    config['test_status'] = 'failed'
+                    config['test_message'] = str(e)
+
+                # Update UI in main thread after each test
+                self.dialog.after(0, lambda: self.refresh_config_list_with_selection(selected_name))
+
+            # All tests completed
+            self.dialog.after(0, lambda: self.batch_test_complete())
+
+        threading.Thread(target=run_batch_test, daemon=True).start()
+
+    def batch_test_complete(self):
+        """批量测试完成"""
+        self.batch_test_btn.configure(text="批量测试", state="normal")
+        configs = self.parent.configs_data["configs"]
+
+        success_count = sum(1 for c in configs if c.get('test_status') == 'success')
+        total_count = len(configs)
+
+        if success_count == total_count:
+            self.show_status(f"批量测试完成：全部 {total_count} 个配置测试通过", COLORS["success_green"], permanent=True)
+        else:
+            self.show_status(f"批量测试完成：{success_count}/{total_count} 个配置测试通过", COLORS["accent_red"], permanent=True)
 
 
 def main():
