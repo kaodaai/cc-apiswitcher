@@ -116,7 +116,7 @@ class ClaudeConfigSwitcher:
             COLORS = DARK_COLORS
 
     def load_app_state(self):
-        """Load the last selected file and theme from app state"""
+        """Load the last selected file, theme, and config methods from app state"""
         try:
             if self.app_state_file.exists():
                 with open(self.app_state_file, 'r', encoding='utf-8') as f:
@@ -124,18 +124,19 @@ class ClaudeConfigSwitcher:
                     return {
                         'last_selected_file': state.get('last_selected_file'),
                         'theme_mode': state.get('theme_mode', 'dark'),
+                        'config_methods': state.get('config_methods', ['file']),
                     }
         except (json.JSONDecodeError, IOError):
             pass
-        return {'last_selected_file': None, 'theme_mode': 'dark'}
+        return {'last_selected_file': None, 'theme_mode': 'dark', 'config_methods': ['file']}
 
-    def save_app_state(self, selected_file_name=None, theme_mode=None):
-        """Save the current selected file and theme to app state"""
+    def save_app_state(self, selected_file_name=None, theme_mode=None, config_methods=None):
+        """Save the current selected file, theme, and config methods to app state"""
         try:
             self.claude_dir.mkdir(exist_ok=True)
 
             # Load existing state
-            state = {'last_selected_file': None, 'theme_mode': 'dark'}
+            state = {'last_selected_file': None, 'theme_mode': 'dark', 'config_methods': ['file']}
             if self.app_state_file.exists():
                 try:
                     with open(self.app_state_file, 'r', encoding='utf-8') as f:
@@ -148,6 +149,8 @@ class ClaudeConfigSwitcher:
                 state['last_selected_file'] = selected_file_name
             if theme_mode is not None:
                 state['theme_mode'] = theme_mode
+            if config_methods is not None:
+                state['config_methods'] = config_methods
 
             with open(self.app_state_file, 'w', encoding='utf-8') as f:
                 json.dump(state, f, indent=2)
@@ -1326,12 +1329,16 @@ class ClaudeConfigSwitcher:
         except Exception as e:
             return False, f"调用失败: {str(e)}", {}
 
-    def add_config(self, name: str, base_url: str, auth_token: str, model: str, config_method: str = "file") -> bool:
+    def add_config(self, name: str, base_url: str, auth_token: str, model: str, config_method = "file") -> bool:
         """Add a new configuration"""
         # Check if name already exists
         for config in self.configs_data["configs"]:
             if config["name"] == name:
                 return False
+
+        # Convert config_method to list if it's not already
+        if isinstance(config_method, str):
+            config_method = [config_method]
 
         new_config = {
             "name": name,
@@ -1345,12 +1352,16 @@ class ClaudeConfigSwitcher:
         self.save_configs_data()
         return True
 
-    def update_config(self, old_name: str, name: str, base_url: str, auth_token: str, model: str, config_method: str = "file") -> bool:
+    def update_config(self, old_name: str, name: str, base_url: str, auth_token: str, model: str, config_method = "file") -> bool:
         """Update an existing configuration"""
         # Check if new name conflicts with another config
         for config in self.configs_data["configs"]:
             if config["name"] == name and config["name"] != old_name:
                 return False
+
+        # Convert config_method to list if it's not already
+        if isinstance(config_method, str):
+            config_method = [config_method]
 
         for config in self.configs_data["configs"]:
             if config["name"] == old_name:
@@ -2036,33 +2047,36 @@ class ConfigManagerDialog:
         )
         method_label.pack(anchor="w")
 
-        self.config_method_var = ctk.StringVar(value="file")
-        method_radio_frame = ctk.CTkFrame(method_frame, fg_color="transparent")
-        method_radio_frame.pack(fill="x", pady=(5, 0))
+        method_check_frame = ctk.CTkFrame(method_frame, fg_color="transparent")
+        method_check_frame.pack(fill="x", pady=(5, 0))
 
-        self.file_method_radio = ctk.CTkRadioButton(
-            method_radio_frame,
+        self.file_method_var = ctk.BooleanVar(value=True)
+        self.file_method_check = ctk.CTkCheckBox(
+            method_check_frame,
             text="Claude Code 配置文件",
-            variable=self.config_method_var,
-            value="file",
+            variable=self.file_method_var,
             font=self.get_font(size=11),
             text_color=COLORS["text_primary"]
         )
-        self.file_method_radio.pack(side="left", padx=(0, 20))
+        self.file_method_check.pack(side="left", padx=(0, 20))
 
-        self.env_method_radio = ctk.CTkRadioButton(
-            method_radio_frame,
+        self.env_method_var = ctk.BooleanVar(value=False)
+        self.env_method_check = ctk.CTkCheckBox(
+            method_check_frame,
             text="Windows 环境变量",
-            variable=self.config_method_var,
-            value="environment",
+            variable=self.env_method_var,
             font=self.get_font(size=11),
-            text_color=COLORS["text_primary"]
+            text_color=COLORS["text_primary"],
+            command=self.save_config_methods_to_state
         )
-        self.env_method_radio.pack(side="left")
+        self.env_method_check.pack(side="left")
+
+        # Also add command to file checkbox
+        self.file_method_check.configure(command=self.save_config_methods_to_state)
 
         # Load environment variables button
         load_env_btn = ctk.CTkButton(
-            method_radio_frame,
+            method_check_frame,
             text="加载当前环境变量",
             command=self.show_current_env_vars,
             width=120,
@@ -2285,9 +2299,10 @@ class ConfigManagerDialog:
             form_content,
             text="",
             font=self.get_font(size=11),
-            text_color=COLORS["text_muted"]
+            text_color=COLORS["text_muted"],
+            wraplength=400  # 允许文本换行
         )
-        self.status_label.pack(pady=(10, 0))
+        self.status_label.pack(pady=(15, 0))
 
         self.clear_form()
 
@@ -2404,9 +2419,13 @@ class ConfigManagerDialog:
 
         self.model_var.set(config["default_model"])
 
-        # Set configuration method (default to file if not specified)
-        method = config.get("config_method", "file")
-        self.config_method_var.set(method)
+        # Set configuration methods (support multiple methods)
+        methods = config.get("config_method", ["file"])
+        if isinstance(methods, str):
+            methods = [methods]  # Convert to list if it's a string
+
+        self.file_method_var.set("file" in methods)
+        self.env_method_var.set("environment" in methods)
 
         # Update form state
         self.save_btn.configure(text="更新")
@@ -2430,7 +2449,12 @@ class ConfigManagerDialog:
         self.url_entry.insert(0, "https://api.anthropic.com")
         self.token_entry.delete(0, "end")
         self.model_var.set("claude-sonnet-4-20250514")
-        self.config_method_var.set("file")
+
+        # Load saved config methods from app state
+        app_state = self.parent.load_app_state()
+        saved_methods = app_state.get('config_methods', ['file'])
+        self.file_method_var.set('file' in saved_methods)
+        self.env_method_var.set('environment' in saved_methods)
 
         self.save_btn.configure(text="保存")
         self.delete_btn.configure(state="disabled")
@@ -2450,7 +2474,18 @@ class ConfigManagerDialog:
         base_url = self.url_entry.get().strip()
         auth_token = self.token_entry.get().strip()
         model = self.model_var.get()
-        config_method = self.config_method_var.get()
+
+        # Get selected configuration methods
+        config_methods = []
+        if self.file_method_var.get():
+            config_methods.append("file")
+        if self.env_method_var.get():
+            config_methods.append("environment")
+
+        # If no method selected, default to file
+        if not config_methods:
+            config_methods = ["file"]
+            self.file_method_var.set(True)
 
         if not all([name, base_url, auth_token, model]):
             self.show_status("请填写所有字段", COLORS["accent_red"])
@@ -2459,7 +2494,7 @@ class ConfigManagerDialog:
         if self.selected_config:
             # Update existing config
             old_name = self.selected_config["name"]
-            if self.parent.update_config(old_name, name, base_url, auth_token, model, config_method):
+            if self.parent.update_config(old_name, name, base_url, auth_token, model, config_methods):
                 self.show_status("配置更新成功", COLORS["success_green"])
                 self.refresh_config_list()
                 # Select the updated config
@@ -2471,7 +2506,7 @@ class ConfigManagerDialog:
                 self.show_status("更新失败：名称已存在", COLORS["accent_red"])
         else:
             # Add new config
-            if self.parent.add_config(name, base_url, auth_token, model, config_method):
+            if self.parent.add_config(name, base_url, auth_token, model, config_methods):
                 self.show_status("配置添加成功", COLORS["success_green"])
                 self.refresh_config_list()
                 # Select the new config
@@ -2542,6 +2577,17 @@ class ConfigManagerDialog:
         except Exception as e:
             self.show_status(f"清除环境变量时出错: {str(e)}", COLORS["accent_red"])
 
+    def save_config_methods_to_state(self):
+        """Save current configuration method selection to app state"""
+        config_methods = []
+        if self.file_method_var.get():
+            config_methods.append("file")
+        if self.env_method_var.get():
+            config_methods.append("environment")
+
+        # Save to app state for persistence
+        self.parent.save_app_state(config_methods=config_methods)
+
     def show_current_env_vars(self):
         """Show current environment variables in form"""
         env_vars = self.parent.get_environment_variables()
@@ -2557,10 +2603,31 @@ class ConfigManagerDialog:
             return
 
         name = self.selected_config["name"]
-        config_method = self.config_method_var.get()
 
-        if config_method == "environment":
-            # Set environment variables
+        # Get selected configuration methods
+        config_methods = []
+        if self.file_method_var.get():
+            config_methods.append("file")
+        if self.env_method_var.get():
+            config_methods.append("environment")
+
+        # If no method selected, default to file
+        if not config_methods:
+            config_methods = ["file"]
+
+        success_messages = []
+        error_messages = []
+
+        # Apply each selected configuration method
+        if "file" in config_methods:
+            if self.parent.switch_to_config(name):
+                success_messages.append("配置文件")
+                # Refresh the main window
+                self.parent.refresh_config_list()
+            else:
+                error_messages.append("配置文件")
+
+        if "environment" in config_methods:
             is_admin = self.parent.is_admin()
             env_type = "系统环境变量" if is_admin else "用户环境变量"
 
@@ -2568,18 +2635,31 @@ class ConfigManagerDialog:
                 self.selected_config["ANTHROPIC_BASE_URL"],
                 self.selected_config["ANTHROPIC_AUTH_TOKEN"]
             ):
-                self.show_status(f"已通过{env_type}切换到配置 '{name}'，重启应用后生效", COLORS["success_green"], permanent=True)
+                success_messages.append(env_type)
             else:
-                self.show_status("环境变量设置失败", COLORS["accent_red"])
+                error_messages.append(env_type)
+
+        # Show status message
+        if success_messages and not error_messages:
+            # All methods succeeded
+            if len(success_messages) == 1:
+                self.show_status(f"已通过{success_messages[0]}切换到配置 '{name}'", COLORS["success_green"])
+            else:
+                self.show_status(f"已通过{', '.join(success_messages)}切换到配置 '{name}'", COLORS["success_green"])
+            self.refresh_config_list()
+        elif success_messages and error_messages:
+            # Partial success
+            self.show_status(f"部分成功: {', '.join(success_messages)}生效, {', '.join(error_messages)}失败", COLORS["warning_orange"], permanent=True)
+            self.refresh_config_list()
+        elif error_messages:
+            # All failed
+            if len(error_messages) == 1:
+                self.show_status(f"{error_messages[0]}设置失败", COLORS["accent_red"])
+            else:
+                self.show_status(f"所有配置方式都失败: {', '.join(error_messages)}", COLORS["accent_red"])
         else:
-            # Use file method (original behavior)
-            if self.parent.switch_to_config(name):
-                self.show_status(f"已切换到配置 '{name}'", COLORS["success_green"])
-                self.refresh_config_list()
-                # Refresh the main window
-                self.parent.refresh_config_list()
-            else:
-                self.show_status("切换配置失败", COLORS["accent_red"])
+            # No methods selected (shouldn't happen due to default)
+            self.show_status("切换配置失败", COLORS["accent_red"])
 
     def test_current_config(self):
         base_url = self.url_entry.get().strip()
@@ -2610,10 +2690,18 @@ class ConfigManagerDialog:
         self.show_status(f"测试结果: {message}", color, permanent=True)  # 永久显示测试结果
 
     def show_status(self, message, color, permanent=False):
+        print(f"显示状态: {message}")  # 调试输出
         self.status_label.configure(text=message, text_color=color)
+
+        # 同时在窗口标题显示状态
+        original_title = self.dialog.title()
+        status_prefix = "✓ " if "成功" in message else "✗ " if "失败" in message else "ℹ "
+        self.dialog.title(f"{status_prefix}{original_title}")
+
         # Only clear after 5 seconds if not permanent
         if not permanent:
             self.dialog.after(5000, lambda: self.status_label.configure(text=""))
+            self.dialog.after(5000, lambda: self.dialog.title(original_title))
 
     def close_dialog(self):
         self.dialog.destroy()
