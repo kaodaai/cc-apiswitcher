@@ -7,6 +7,7 @@ import tkinter.messagebox as messagebox
 import tkinter.font as tkfont
 from pathlib import Path
 from typing import Dict, List, Optional, Any
+import winreg
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("dark-blue")
@@ -1325,7 +1326,7 @@ class ClaudeConfigSwitcher:
         except Exception as e:
             return False, f"调用失败: {str(e)}", {}
 
-    def add_config(self, name: str, base_url: str, auth_token: str, model: str) -> bool:
+    def add_config(self, name: str, base_url: str, auth_token: str, model: str, config_method: str = "file") -> bool:
         """Add a new configuration"""
         # Check if name already exists
         for config in self.configs_data["configs"]:
@@ -1336,14 +1337,15 @@ class ClaudeConfigSwitcher:
             "name": name,
             "ANTHROPIC_BASE_URL": base_url,
             "ANTHROPIC_AUTH_TOKEN": auth_token,
-            "default_model": model
+            "default_model": model,
+            "config_method": config_method
         }
 
         self.configs_data["configs"].append(new_config)
         self.save_configs_data()
         return True
 
-    def update_config(self, old_name: str, name: str, base_url: str, auth_token: str, model: str) -> bool:
+    def update_config(self, old_name: str, name: str, base_url: str, auth_token: str, model: str, config_method: str = "file") -> bool:
         """Update an existing configuration"""
         # Check if new name conflicts with another config
         for config in self.configs_data["configs"]:
@@ -1356,6 +1358,7 @@ class ClaudeConfigSwitcher:
                 config["ANTHROPIC_BASE_URL"] = base_url
                 config["ANTHROPIC_AUTH_TOKEN"] = auth_token
                 config["default_model"] = model
+                config["config_method"] = config_method
 
                 # Update active config name if it was changed
                 if self.configs_data["active_config"] == old_name:
@@ -1404,6 +1407,208 @@ class ClaudeConfigSwitcher:
                 except Exception:
                     return False
         return False
+
+    def is_admin(self) -> bool:
+        """Check if the current process has administrator privileges"""
+        try:
+            import ctypes
+            return ctypes.windll.shell32.IsUserAnAdmin() != 0
+        except:
+            return False
+
+    def set_environment_variables(self, base_url: str, auth_token: str, system_wide: bool = None) -> bool:
+        """Set Windows environment variables"""
+        try:
+            # Set for current process
+            os.environ["ANTHROPIC_BASE_URL"] = base_url
+            os.environ["ANTHROPIC_AUTH_TOKEN"] = auth_token
+
+            # Determine if we should try system-wide first
+            if system_wide is None:
+                system_wide = self.is_admin()
+
+            if system_wide and self.is_admin():
+                # Try to set system-wide environment variables (requires admin rights)
+                try:
+                    key = winreg.OpenKey(
+                        winreg.HKEY_LOCAL_MACHINE,
+                        r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment",
+                        0,
+                        winreg.KEY_ALL_ACCESS
+                    )
+                    winreg.SetValueEx(key, "ANTHROPIC_BASE_URL", 0, winreg.REG_SZ, base_url)
+                    winreg.SetValueEx(key, "ANTHROPIC_AUTH_TOKEN", 0, winreg.REG_SZ, auth_token)
+                    winreg.CloseKey(key)
+                    self._notify_env_change()
+                    return True
+                except Exception as e:
+                    print(f"系统环境变量设置失败: {e}")
+                    return False
+            else:
+                # Set user environment variables
+                return self._set_user_environment_variables(base_url, auth_token)
+
+        except Exception as e:
+            print(f"Error setting environment variables: {e}")
+            return False
+
+    def _set_user_environment_variables(self, base_url: str, auth_token: str) -> bool:
+        """Set user-level environment variables"""
+        try:
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_ALL_ACCESS)
+            winreg.SetValueEx(key, "ANTHROPIC_BASE_URL", 0, winreg.REG_SZ, base_url)
+            winreg.SetValueEx(key, "ANTHROPIC_AUTH_TOKEN", 0, winreg.REG_SZ, auth_token)
+            winreg.CloseKey(key)
+            self._notify_env_change()
+            return True
+        except Exception as e:
+            print(f"用户环境变量设置失败: {e}")
+            return False
+
+    def _notify_env_change(self):
+        """Notify system of environment variable changes"""
+        try:
+            import ctypes
+            HWND_BROADCAST = 0xFFFF
+            WM_SETTINGCHANGE = 0x1A
+            SMTO_ABORTIFHUNG = 0x0002
+            result = ctypes.c_long()
+            ctypes.windll.user32.SendMessageTimeoutW(
+                HWND_BROADCAST,
+                WM_SETTINGCHANGE,
+                0,
+                "Environment",
+                SMTO_ABORTIFHUNG,
+                5000,
+                ctypes.byref(result)
+            )
+        except Exception as e:
+            print(f"通知系统环境变量变更失败: {e}")
+
+    def get_environment_variables(self) -> Dict[str, str]:
+        """Get current environment variables from both system and user levels"""
+        result = {"ANTHROPIC_BASE_URL": "", "ANTHROPIC_AUTH_TOKEN": ""}
+
+        # First check current process environment (includes both system and user vars)
+        result["ANTHROPIC_BASE_URL"] = os.environ.get("ANTHROPIC_BASE_URL", "")
+        result["ANTHROPIC_AUTH_TOKEN"] = os.environ.get("ANTHROPIC_AUTH_TOKEN", "")
+
+        # If not found in process, check registry directly
+        if not result["ANTHROPIC_BASE_URL"] or not result["ANTHROPIC_AUTH_TOKEN"]:
+            # Check system environment variables first (if admin)
+            if self.is_admin():
+                try:
+                    key = winreg.OpenKey(
+                        winreg.HKEY_LOCAL_MACHINE,
+                        r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment",
+                        0,
+                        winreg.KEY_READ
+                    )
+
+                    if not result["ANTHROPIC_BASE_URL"]:
+                        try:
+                            result["ANTHROPIC_BASE_URL"] = winreg.QueryValueEx(key, "ANTHROPIC_BASE_URL")[0]
+                        except WindowsError:
+                            pass
+
+                    if not result["ANTHROPIC_AUTH_TOKEN"]:
+                        try:
+                            result["ANTHROPIC_AUTH_TOKEN"] = winreg.QueryValueEx(key, "ANTHROPIC_AUTH_TOKEN")[0]
+                        except WindowsError:
+                            pass
+
+                    winreg.CloseKey(key)
+                except Exception:
+                    pass
+
+            # Check user environment variables as fallback
+            try:
+                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_READ)
+
+                if not result["ANTHROPIC_BASE_URL"]:
+                    try:
+                        result["ANTHROPIC_BASE_URL"] = winreg.QueryValueEx(key, "ANTHROPIC_BASE_URL")[0]
+                    except WindowsError:
+                        pass
+
+                if not result["ANTHROPIC_AUTH_TOKEN"]:
+                    try:
+                        result["ANTHROPIC_AUTH_TOKEN"] = winreg.QueryValueEx(key, "ANTHROPIC_AUTH_TOKEN")[0]
+                    except WindowsError:
+                        pass
+
+                winreg.CloseKey(key)
+            except Exception:
+                pass
+
+        return result
+
+    def clear_environment_variables(self, system_wide: bool = None) -> bool:
+        """Clear environment variables"""
+        try:
+            # Remove from current process
+            if "ANTHROPIC_BASE_URL" in os.environ:
+                del os.environ["ANTHROPIC_BASE_URL"]
+            if "ANTHROPIC_AUTH_TOKEN" in os.environ:
+                del os.environ["ANTHROPIC_AUTH_TOKEN"]
+
+            # Determine if we should try system-wide first
+            if system_wide is None:
+                system_wide = self.is_admin()
+
+            success = False
+
+            if system_wide and self.is_admin():
+                # Try to clear system environment variables first
+                try:
+                    key = winreg.OpenKey(
+                        winreg.HKEY_LOCAL_MACHINE,
+                        r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment",
+                        0,
+                        winreg.KEY_ALL_ACCESS
+                    )
+
+                    try:
+                        winreg.DeleteValue(key, "ANTHROPIC_BASE_URL")
+                    except WindowsError:
+                        pass  # Key doesn't exist
+
+                    try:
+                        winreg.DeleteValue(key, "ANTHROPIC_AUTH_TOKEN")
+                    except WindowsError:
+                        pass  # Key doesn't exist
+
+                    winreg.CloseKey(key)
+                    success = True
+                except Exception as e:
+                    print(f"清除系统环境变量失败: {e}")
+
+            # Also clear user environment variables
+            try:
+                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_ALL_ACCESS)
+
+                try:
+                    winreg.DeleteValue(key, "ANTHROPIC_BASE_URL")
+                except WindowsError:
+                    pass  # Key doesn't exist
+
+                try:
+                    winreg.DeleteValue(key, "ANTHROPIC_AUTH_TOKEN")
+                except WindowsError:
+                    pass  # Key doesn't exist
+
+                winreg.CloseKey(key)
+                success = True
+            except Exception as e:
+                print(f"清除用户环境变量失败: {e}")
+
+            if success:
+                self._notify_env_change()
+
+            return success
+        except Exception as e:
+            print(f"Error clearing environment variables: {e}")
+            return False
 
     def open_config_manager(self):
         """Open the configuration management dialog"""
@@ -1819,6 +2024,58 @@ class ConfigManagerDialog:
         form_content = ctk.CTkFrame(self.details_frame, fg_color="transparent")
         form_content.pack(fill="both", expand=True, padx=20, pady=20)
 
+        # Configuration method selection
+        method_frame = ctk.CTkFrame(form_content, fg_color="transparent")
+        method_frame.pack(fill="x", pady=(0, 15))
+
+        method_label = ctk.CTkLabel(
+            method_frame,
+            text="配置方式:",
+            font=self.get_font(size=12),
+            text_color=COLORS["text_primary"]
+        )
+        method_label.pack(anchor="w")
+
+        self.config_method_var = ctk.StringVar(value="file")
+        method_radio_frame = ctk.CTkFrame(method_frame, fg_color="transparent")
+        method_radio_frame.pack(fill="x", pady=(5, 0))
+
+        self.file_method_radio = ctk.CTkRadioButton(
+            method_radio_frame,
+            text="Claude Code 配置文件",
+            variable=self.config_method_var,
+            value="file",
+            font=self.get_font(size=11),
+            text_color=COLORS["text_primary"]
+        )
+        self.file_method_radio.pack(side="left", padx=(0, 20))
+
+        self.env_method_radio = ctk.CTkRadioButton(
+            method_radio_frame,
+            text="Windows 环境变量",
+            variable=self.config_method_var,
+            value="environment",
+            font=self.get_font(size=11),
+            text_color=COLORS["text_primary"]
+        )
+        self.env_method_radio.pack(side="left")
+
+        # Load environment variables button
+        load_env_btn = ctk.CTkButton(
+            method_radio_frame,
+            text="加载当前环境变量",
+            command=self.show_current_env_vars,
+            width=120,
+            height=25,
+            font=self.get_font(size=10),
+            fg_color=COLORS["bg_tertiary"],
+            hover_color=COLORS["card_hover"],
+            text_color=COLORS["text_primary"],
+            border_width=1,
+            border_color=COLORS["border"]
+        )
+        load_env_btn.pack(side="right")
+
         # Name field
         name_frame = ctk.CTkFrame(form_content, fg_color="transparent")
         name_frame.pack(fill="x", pady=(0, 15))
@@ -1967,6 +2224,48 @@ class ConfigManagerDialog:
             font=self.get_font(size=12)
         )
 
+        # Environment Variable buttons
+        env_buttons_frame = ctk.CTkFrame(button_frame, fg_color="transparent")
+        env_buttons_frame.pack(side="right", padx=(10, 0))
+
+        # Check admin status
+        is_admin = self.parent.is_admin()
+        admin_status_text = "管理员" if is_admin else "普通用户"
+        env_type_text = "系统环境变量" if is_admin else "用户环境变量"
+
+        # Admin status label
+        admin_label = ctk.CTkLabel(
+            env_buttons_frame,
+            text=f"当前权限: {admin_status_text}",
+            font=self.get_font(size=9),
+            text_color=COLORS["success_green"] if is_admin else COLORS["warning_orange"]
+        )
+        admin_label.pack(side="top", pady=(0, 2))
+
+        self.set_env_btn = ctk.CTkButton(
+            env_buttons_frame,
+            text=f"设置{env_type_text}",
+            command=self.set_environment_vars,
+            width=120,
+            fg_color=COLORS["success_green"],
+            hover_color="#45a049",
+            text_color="white",
+            font=self.get_font(size=11)
+        )
+        self.set_env_btn.pack(side="top", pady=(0, 2))
+
+        self.clear_env_btn = ctk.CTkButton(
+            env_buttons_frame,
+            text=f"清除{env_type_text}",
+            command=self.clear_environment_vars,
+            width=120,
+            fg_color=COLORS["accent_red"],
+            hover_color=COLORS["accent_red_hover"],
+            text_color="white",
+            font=self.get_font(size=11)
+        )
+        self.clear_env_btn.pack(side="bottom")
+
         # API Test button
         self.api_test_btn = ctk.CTkButton(
             button_frame,
@@ -1979,7 +2278,7 @@ class ConfigManagerDialog:
             font=self.get_font(size=12)
         )
         self.api_test_btn.pack(side="right", padx=(10, 0))
-        self.switch_btn.pack(side="right")
+        self.switch_btn.pack(side="right", padx=(0, 10))
 
         # Status label
         self.status_label = ctk.CTkLabel(
@@ -2105,6 +2404,10 @@ class ConfigManagerDialog:
 
         self.model_var.set(config["default_model"])
 
+        # Set configuration method (default to file if not specified)
+        method = config.get("config_method", "file")
+        self.config_method_var.set(method)
+
         # Update form state
         self.save_btn.configure(text="更新")
         self.delete_btn.configure(state="normal")
@@ -2127,6 +2430,7 @@ class ConfigManagerDialog:
         self.url_entry.insert(0, "https://api.anthropic.com")
         self.token_entry.delete(0, "end")
         self.model_var.set("claude-sonnet-4-20250514")
+        self.config_method_var.set("file")
 
         self.save_btn.configure(text="保存")
         self.delete_btn.configure(state="disabled")
@@ -2146,6 +2450,7 @@ class ConfigManagerDialog:
         base_url = self.url_entry.get().strip()
         auth_token = self.token_entry.get().strip()
         model = self.model_var.get()
+        config_method = self.config_method_var.get()
 
         if not all([name, base_url, auth_token, model]):
             self.show_status("请填写所有字段", COLORS["accent_red"])
@@ -2154,7 +2459,7 @@ class ConfigManagerDialog:
         if self.selected_config:
             # Update existing config
             old_name = self.selected_config["name"]
-            if self.parent.update_config(old_name, name, base_url, auth_token, model):
+            if self.parent.update_config(old_name, name, base_url, auth_token, model, config_method):
                 self.show_status("配置更新成功", COLORS["success_green"])
                 self.refresh_config_list()
                 # Select the updated config
@@ -2166,7 +2471,7 @@ class ConfigManagerDialog:
                 self.show_status("更新失败：名称已存在", COLORS["accent_red"])
         else:
             # Add new config
-            if self.parent.add_config(name, base_url, auth_token, model):
+            if self.parent.add_config(name, base_url, auth_token, model, config_method):
                 self.show_status("配置添加成功", COLORS["success_green"])
                 self.refresh_config_list()
                 # Select the new config
@@ -2196,18 +2501,85 @@ class ConfigManagerDialog:
             else:
                 self.show_status("删除配置失败", COLORS["accent_red"])
 
+    def set_environment_vars(self):
+        """Set Windows environment variables with current form values"""
+        base_url = self.url_entry.get().strip()
+        auth_token = self.token_entry.get().strip()
+
+        if not all([base_url, auth_token]):
+            self.show_status("请填写URL和认证令牌", COLORS["accent_red"])
+            return
+
+        try:
+            is_admin = self.parent.is_admin()
+            env_type = "系统环境变量" if is_admin else "用户环境变量"
+
+            print(f"正在设置{env_type}...")
+            print(f"URL: {base_url}")
+            print(f"Token: {auth_token[:20]}...")
+            print(f"管理员权限: {is_admin}")
+
+            result = self.parent.set_environment_variables(base_url, auth_token)
+            print(f"设置结果: {result}")
+
+            if result:
+                self.show_status(f"{env_type}设置成功，重启应用后生效", COLORS["success_green"], permanent=True)
+            else:
+                self.show_status("环境变量设置失败", COLORS["accent_red"])
+        except Exception as e:
+            print(f"设置环境变量时出错: {e}")
+            self.show_status(f"设置环境变量时出错: {str(e)}", COLORS["accent_red"])
+
+    def clear_environment_vars(self):
+        """Clear Windows environment variables"""
+        try:
+            is_admin = self.parent.is_admin()
+            if self.parent.clear_environment_variables():
+                env_type = "系统和用户环境变量" if is_admin else "用户环境变量"
+                self.show_status(f"{env_type}已清除，重启应用后生效", COLORS["success_green"], permanent=True)
+            else:
+                self.show_status("清除环境变量失败", COLORS["accent_red"])
+        except Exception as e:
+            self.show_status(f"清除环境变量时出错: {str(e)}", COLORS["accent_red"])
+
+    def show_current_env_vars(self):
+        """Show current environment variables in form"""
+        env_vars = self.parent.get_environment_variables()
+        if env_vars["ANTHROPIC_BASE_URL"]:
+            self.url_entry.delete(0, "end")
+            self.url_entry.insert(0, env_vars["ANTHROPIC_BASE_URL"])
+        if env_vars["ANTHROPIC_AUTH_TOKEN"]:
+            self.token_entry.delete(0, "end")
+            self.token_entry.insert(0, env_vars["ANTHROPIC_AUTH_TOKEN"])
+
     def switch_to_config(self):
         if not self.selected_config:
             return
 
         name = self.selected_config["name"]
-        if self.parent.switch_to_config(name):
-            self.show_status(f"已切换到配置 '{name}'", COLORS["success_green"])
-            self.refresh_config_list()
-            # Refresh the main window
-            self.parent.refresh_config_list()
+        config_method = self.config_method_var.get()
+
+        if config_method == "environment":
+            # Set environment variables
+            is_admin = self.parent.is_admin()
+            env_type = "系统环境变量" if is_admin else "用户环境变量"
+
+            if self.parent.set_environment_variables(
+                self.selected_config["ANTHROPIC_BASE_URL"],
+                self.selected_config["ANTHROPIC_AUTH_TOKEN"]
+            ):
+                self.show_status(f"已通过{env_type}切换到配置 '{name}'，重启应用后生效", COLORS["success_green"], permanent=True)
+            else:
+                self.show_status("环境变量设置失败", COLORS["accent_red"])
         else:
-            self.show_status("切换配置失败", COLORS["accent_red"])
+            # Use file method (original behavior)
+            if self.parent.switch_to_config(name):
+                self.show_status(f"已切换到配置 '{name}'", COLORS["success_green"])
+                self.refresh_config_list()
+                # Refresh the main window
+                self.parent.refresh_config_list()
+            else:
+                self.show_status("切换配置失败", COLORS["accent_red"])
 
     def test_current_config(self):
         base_url = self.url_entry.get().strip()
