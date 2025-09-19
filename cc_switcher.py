@@ -262,21 +262,7 @@ class ClaudeConfigSwitcher:
         button_container = ctk.CTkFrame(toolbar_container, fg_color="transparent")
         button_container.pack(side="bottom")
 
-        # Settings button (gear icon) - at the very bottom
-        self.settings_btn = ctk.CTkButton(
-            button_container,
-            text="⚙",
-            command=self.open_settings,
-            width=26,
-            height=26,
-            corner_radius=0,
-            fg_color="transparent",
-            hover_color=COLORS["card_hover"],
-            text_color=COLORS["text_primary"],
-            font=ctk.CTkFont(family="Segoe UI", size=14),
-            border_width=0,
-        )
-        self.settings_btn.pack(side="bottom", pady=(4, 0))
+        # Settings button will be created after right_panel is initialized
 
         # Theme toggle button (sun/moon icon) - above settings
         initial_theme_icon = "☀" if ctk.get_appearance_mode() == "Light" else "🌙"
@@ -394,9 +380,10 @@ class ClaudeConfigSwitcher:
         )
         self.open_dir_btn.pack(side="right", fill="x", expand=True, padx=(2, 0))
 
-        # --- Config List (takes all remaining space) ---
+        # --- Config List (fixed height) ---
         list_container = ctk.CTkFrame(self.left_panel, fg_color="transparent")
-        list_container.pack(fill="both", expand=True, padx=8, pady=8)
+        list_container.pack(fill="x", padx=8, pady=8)
+        list_container.configure(height=350)  # Fixed height instead of expanding
 
         # Tab-like headers
         header_container = ctk.CTkFrame(list_container, fg_color="transparent")
@@ -471,6 +458,23 @@ class ClaudeConfigSwitcher:
         self.preview_textbox.pack(fill="both", expand=True)
 
         self.selected_config = None
+
+        # Settings button (gear icon) - positioned in bottom right corner
+        self.settings_btn = ctk.CTkButton(
+            self.right_panel,
+            text="⚙",
+            command=self.open_settings,
+            width=30,
+            height=30,
+            corner_radius=15,
+            fg_color=COLORS["accent_primary"],
+            hover_color=COLORS["accent_hover"],
+            text_color="white",
+            font=ctk.CTkFont(family="Segoe UI", size=14),
+            border_width=0,
+        )
+        # Position in bottom right corner of right panel
+        self.settings_btn.place(relx=1.0, rely=1.0, anchor="se", x=-10, y=-10)
 
     def create_config_button(self, config_file, settings_content):
         # Card container with modern styling
