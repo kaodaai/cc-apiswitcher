@@ -225,6 +225,21 @@ class ClaudeConfigSwitcher:
             weight=ctk_weight
         )
 
+    def create_button(self, parent, text, command, **kwargs):
+        """创建标准化按钮的辅助方法"""
+        default_kwargs = {
+            "height": 30,
+            "corner_radius": 0,
+            "font": self.get_font(size=13),
+            "fg_color": COLORS["bg_tertiary"],
+            "hover_color": COLORS["card_hover"],
+            "text_color": COLORS["text_primary"],
+            "border_width": 1,
+            "border_color": COLORS["border"],
+        }
+        default_kwargs.update(kwargs)
+        return ctk.CTkButton(parent, text=text, command=command, **default_kwargs)
+
     def setup_ui(self):
         # --- 主内容区域 ---
         content_frame = ctk.CTkFrame(self.root, fg_color="transparent")
@@ -282,6 +297,22 @@ class ClaudeConfigSwitcher:
         )
         self.theme_btn.pack(side="bottom", pady=(0, 4))
 
+        # 设置按钮（齿轮图标）- 在主题按钮下方
+        self.settings_btn = ctk.CTkButton(
+            button_container,
+            text="⚙",
+            command=self.open_settings,
+            width=26,
+            height=26,
+            corner_radius=0,
+            fg_color="transparent",
+            hover_color=COLORS["card_hover"],
+            text_color=COLORS["text_primary"],
+            font=ctk.CTkFont(family="Segoe UI", size=14),
+            border_width=0,
+        )
+        self.settings_btn.pack(side="bottom", pady=(0, 0))
+
         # --- Left Panel ---
         self.left_panel = ctk.CTkFrame(content_frame, width=260, corner_radius=0, fg_color=COLORS["bg_secondary"])
         self.left_panel.pack(side="left", fill="y", pady=0, padx=(1, 1))
@@ -302,18 +333,11 @@ class ClaudeConfigSwitcher:
         self.status_label.pack(pady=(0, 4), padx=0, fill="x")
 
         # --- Action Buttons ---
-        self.switch_btn = ctk.CTkButton(
+        self.switch_btn = self.create_button(
             bottom_container,
-            text="切换配置",
-            command=self.switch_config,
-            height=30,
-            font=self.get_font(size=13, weight="bold"),
-            corner_radius=0,
-            fg_color=COLORS["bg_tertiary"],
-            hover_color=COLORS["card_hover"],
-            text_color=COLORS["text_primary"],
-            border_width=1,
-            border_color=COLORS["border"],
+            "切换配置",
+            self.switch_config,
+            font=self.get_font(size=13, weight="bold")
         )
         self.switch_btn.pack(pady=(0, 4), padx=0, fill="x")
 
@@ -321,43 +345,37 @@ class ClaudeConfigSwitcher:
         button_row = ctk.CTkFrame(bottom_container, fg_color="transparent")
         button_row.pack(fill="x", pady=0)
 
-        self.config_manager_btn = ctk.CTkButton(
+        self.config_manager_btn = self.create_button(
             button_row,
-            text="配置管理",
-            command=self.open_config_manager,
-            height=30,
-            corner_radius=0,
+            "配置管理",
+            self.open_config_manager,
             fg_color=COLORS["accent_primary"],
             hover_color=COLORS["accent_hover"],
             text_color="white",
-            font=self.get_font(size=13),
+            border_width=0
         )
         self.config_manager_btn.pack(fill="x", pady=(0, 4))
 
-        self.api_test_btn = ctk.CTkButton(
+        self.api_test_btn = self.create_button(
             button_row,
-            text="API 测试",
-            command=self.open_api_test,
-            height=30,
-            corner_radius=0,
+            "API 测试",
+            self.open_api_test,
             fg_color=COLORS["warning_orange"],
             hover_color="#e68900",
             text_color="white",
-            font=self.get_font(size=13),
+            border_width=0
         )
         self.api_test_btn.pack(fill="x", pady=(0, 4))
 
         # Environment variable switch button
-        self.switch_env_btn = ctk.CTkButton(
+        self.switch_env_btn = self.create_button(
             button_row,
-            text="切换环境变量",
-            command=self.switch_environment_variable,
-            height=30,
-            corner_radius=0,
+            "切换环境变量",
+            self.switch_environment_variable,
             fg_color=COLORS["success_green"],
             hover_color="#45a049",
             text_color="white",
-            font=self.get_font(size=13),
+            border_width=0
         )
         self.switch_env_btn.pack(fill="x", pady=(0, 4))
 
@@ -365,33 +383,17 @@ class ClaudeConfigSwitcher:
         button_row2 = ctk.CTkFrame(bottom_container, fg_color="transparent")
         button_row2.pack(fill="x", pady=0)
 
-        self.refresh_btn = ctk.CTkButton(
+        self.refresh_btn = self.create_button(
             button_row2,
-            text="刷新",
-            command=self.refresh_config_list,
-            height=30,
-            corner_radius=0,
-            fg_color=COLORS["bg_tertiary"],
-            hover_color=COLORS["card_hover"],
-            text_color=COLORS["text_primary"],
-            font=self.get_font(size=13),
-            border_width=1,
-            border_color=COLORS["border"],
+            "刷新",
+            self.refresh_config_list
         )
         self.refresh_btn.pack(side="left", fill="x", expand=True, padx=(0, 2))
 
-        self.open_dir_btn = ctk.CTkButton(
+        self.open_dir_btn = self.create_button(
             button_row2,
-            text="打开目录",
-            command=self.open_config_directory,
-            height=30,
-            corner_radius=0,
-            fg_color=COLORS["bg_tertiary"],
-            hover_color=COLORS["card_hover"],
-            text_color=COLORS["text_primary"],
-            font=self.get_font(size=13),
-            border_width=1,
-            border_color=COLORS["border"],
+            "打开目录",
+            self.open_config_directory
         )
         self.open_dir_btn.pack(side="right", fill="x", expand=True, padx=(2, 0))
 
@@ -473,23 +475,6 @@ class ClaudeConfigSwitcher:
         self.preview_textbox.pack(fill="both", expand=True)
 
         self.selected_config = None
-
-        # Settings button (gear icon) - positioned in bottom right corner
-        self.settings_btn = ctk.CTkButton(
-            self.right_panel,
-            text="⚙",
-            command=self.open_settings,
-            width=30,
-            height=30,
-            corner_radius=15,
-            fg_color=COLORS["accent_primary"],
-            hover_color=COLORS["accent_hover"],
-            text_color="white",
-            font=ctk.CTkFont(family="Segoe UI", size=14),
-            border_width=0,
-        )
-        # Position in bottom right corner of right panel
-        self.settings_btn.place(relx=1.0, rely=1.0, anchor="se", x=-10, y=-10)
 
     def create_config_button(self, config_file, settings_content):
         # Card container with modern styling
