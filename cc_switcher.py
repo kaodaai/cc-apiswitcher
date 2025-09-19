@@ -346,6 +346,20 @@ class ClaudeConfigSwitcher:
         )
         self.api_test_btn.pack(fill="x", pady=(0, 4))
 
+        # Environment variable switch button
+        self.switch_env_btn = ctk.CTkButton(
+            button_row,
+            text="切换环境变量",
+            command=self.switch_environment_variable,
+            height=30,
+            corner_radius=0,
+            fg_color=COLORS["success_green"],
+            hover_color="#45a049",
+            text_color="white",
+            font=self.get_font(size=13),
+        )
+        self.switch_env_btn.pack(fill="x", pady=(0, 4))
+
         # Second button row
         button_row2 = ctk.CTkFrame(bottom_container, fg_color="transparent")
         button_row2.pack(fill="x", pady=0)
@@ -506,8 +520,9 @@ class ClaudeConfigSwitcher:
         # Status indicator with modern styling
         is_active = config_file.name == "settings.json"
         is_synced = False
+        is_virtual = not hasattr(config_file, 'exists') or not config_file.exists()
 
-        if not is_active and settings_content is not None:
+        if not is_active and not is_virtual and settings_content is not None:
             try:
                 with open(config_file, 'r', encoding='utf-8') as f:
                     current_content = json.load(f)
@@ -516,7 +531,16 @@ class ClaudeConfigSwitcher:
             except (json.JSONDecodeError, IOError):
                 pass
 
-        if is_active:
+        if is_virtual:
+            # Virtual config from config management - show different indicator
+            status_label = ctk.CTkLabel(
+                content_frame,
+                text="◆",
+                font=self.get_font(size=15, weight="bold"),
+                text_color=COLORS["warning_orange"],
+            )
+            status_label.pack(side="right", padx=(6, 0))
+        elif is_active:
             status_label = ctk.CTkLabel(
                 content_frame,
                 text="●",
@@ -600,7 +624,31 @@ class ClaudeConfigSwitcher:
         try:
             self.preview_textbox.delete("1.0", "end")
 
-            if config_file.exists():
+            # Check if this is a virtual config (from config management)
+            is_virtual = not hasattr(config_file, 'exists') or not config_file.exists()
+
+            if is_virtual:
+                # Look for corresponding config data
+                target_config = None
+                for config in self.configs_data["configs"]:
+                    if config["name"] == config_file.name:
+                        target_config = config
+                        break
+
+                if target_config:
+                    # Show config data preview
+                    preview_data = {
+                        "配置名称": target_config["name"],
+                        "基础URL": target_config["ANTHROPIC_BASE_URL"],
+                        "认证令牌": "***" + target_config["ANTHROPIC_AUTH_TOKEN"][-6:] if len(target_config["ANTHROPIC_AUTH_TOKEN"]) > 6 else "***",
+                        "默认模型": target_config["default_model"],
+                        "类型": "配置管理器中的配置"
+                    }
+                    formatted_content = json.dumps(preview_data, indent=2, ensure_ascii=False)
+                    self.insert_json_with_highlighting(formatted_content)
+                else:
+                    self.preview_textbox.insert("1.0", "配置数据未找到")
+            elif config_file.exists():
                 with open(config_file, 'r', encoding='utf-8') as f:
                     content = f.read()
                 try:
@@ -609,9 +657,11 @@ class ClaudeConfigSwitcher:
                     self.insert_json_with_highlighting(formatted_content)
                 except json.JSONDecodeError:
                     self.preview_textbox.insert("1.0", content)
+            else:
+                self.preview_textbox.insert("1.0", "文件不存在")
 
-        except Exception:
-            self.update_status("Error reading file", COLORS["accent_red"])
+        except Exception as e:
+            self.update_status(f"Error reading file: {str(e)}", COLORS["accent_red"])
 
     def insert_json_with_highlighting(self, json_content):
         """Insert JSON content with syntax highlighting"""
@@ -713,6 +763,85 @@ class ClaudeConfigSwitcher:
         except Exception:
             self.update_status("切换失败", COLORS["accent_red"])
 
+    def switch_environment_variable(self):
+        """直接切换环境变量到当前选中的配置"""
+        if not self.selected_config:
+            self.update_status("请先选择一个配置", COLORS["accent_red"])
+            return
+
+        # 获取选中配置的文件名
+        config_name = self.selected_config.name
+
+        # 首先尝试从配置数据中查找
+        target_config = None
+        for config in self.configs_data["configs"]:
+            if config["name"] == config_name or config["name"].replace(".json", "") == config_name:
+                target_config = config
+                break
+
+        if target_config:
+            # 使用配置管理器中的数据
+            base_url = target_config["ANTHROPIC_BASE_URL"]
+            auth_token = target_config["ANTHROPIC_AUTH_TOKEN"]
+            display_name = target_config["name"]
+        else:
+            # 如果没有找到配置数据，尝试直接读取配置文件
+            if not self.selected_config.exists():
+                self.update_status("配置文件不存在", COLORS["accent_red"])
+                return
+
+            try:
+                with open(self.selected_config, 'r', encoding='utf-8') as f:
+                    file_content = json.load(f)
+
+                base_url = file_content.get("ANTHROPIC_BASE_URL", "")
+                auth_token = file_content.get("ANTHROPIC_AUTH_TOKEN", "")
+                display_name = config_name
+
+                if not base_url or not auth_token:
+                    self.update_status("配置文件中缺少必要的信息", COLORS["accent_red"])
+                    return
+
+            except (json.JSONDecodeError, IOError) as e:
+                self.update_status(f"读取配置文件失败: {str(e)}", COLORS["accent_red"])
+                return
+
+        try:
+            # 设置环境变量
+            if self.set_environment_variables(base_url, auth_token):
+                self.update_status(f"环境变量已切换到: {display_name}", COLORS["success_green"])
+            else:
+                self.update_status("环境变量切换失败", COLORS["accent_red"])
+        except Exception as e:
+            self.update_status(f"环境变量切换出错: {str(e)}", COLORS["accent_red"])
+
+    def switch_to_managed_config(self):
+        """切换到配置管理器中的配置（从管理配置标签页调用）"""
+        if self.active_tab != "configs":
+            self.update_status("请从'管理配置'标签页选择一个配置", COLORS["accent_red"])
+            return
+
+        if not hasattr(self, 'selected_managed_config') or not self.selected_managed_config:
+            self.update_status("请先选择一个配置", COLORS["accent_red"])
+            return
+
+        config = self.selected_managed_config
+        try:
+            # 设置环境变量
+            if self.set_environment_variables(
+                config["ANTHROPIC_BASE_URL"],
+                config["ANTHROPIC_AUTH_TOKEN"]
+            ):
+                self.update_status(f"环境变量已切换到: {config['name']}", COLORS["success_green"])
+                # 更新活跃配置
+                self.configs_data["active_config"] = config["name"]
+                self.save_configs_data()
+                self.refresh_managed_configs()
+            else:
+                self.update_status("环境变量切换失败", COLORS["accent_red"])
+        except Exception as e:
+            self.update_status(f"环境变量切换出错: {str(e)}", COLORS["accent_red"])
+
     def open_config_directory(self):
         try:
             os.startfile(self.claude_dir)
@@ -751,17 +880,25 @@ class ClaudeConfigSwitcher:
                 except (json.JSONDecodeError, IOError):
                     settings_content = None  # Mark as not readable
 
-            # Scan for settings-related config files and sort them with settings.json on top
+            # Scan for configuration files - include both settings files and config management files
             other_files = []
             settings_file_path = None
+
+            # Get all config names from config management
+            config_names = {config["name"] for config in self.configs_data["configs"]}
+
             for file_path in self.claude_dir.glob("*.json"):
-                file_name = file_path.name.lower()
-                # Filter to only include settings-related files
+                file_name = file_path.name
+                file_name_lower = file_name.lower()
+
+                # Include if it's a settings file OR matches a config name (with or without .json)
                 if (
-                    file_name == "settings.json"
-                    or "settings" in file_name
-                    or file_name.startswith("settings_")
-                    or file_name.endswith("_settings.json")
+                    file_name_lower == "settings.json"
+                    or "settings" in file_name_lower
+                    or file_name_lower.startswith("settings_")
+                    or file_name_lower.endswith("_settings.json")
+                    or file_name in config_names
+                    or file_name.replace(".json", "") in config_names
                 ):
                     if file_path.name == "settings.json":
                         settings_file_path = file_path
@@ -773,6 +910,19 @@ class ClaudeConfigSwitcher:
             if settings_file_path:
                 self.config_files.append(settings_file_path)
             self.config_files.extend(other_files)
+
+            # Also add configs from config management that don't have corresponding files
+            existing_file_names = {f.name for f in self.config_files}
+            for config in self.configs_data["configs"]:
+                if config["name"] not in existing_file_names and config["name"].replace(".json", "") not in existing_file_names:
+                    # Create a virtual config file for management purposes
+                    virtual_config = type('VirtualConfig', (), {
+                        'name': config["name"],
+                        'exists': lambda: False,
+                        '__str__': lambda: config["name"]
+                    })()
+                    virtual_config.name = config["name"]
+                    self.config_files.append(virtual_config)
 
             # Create config buttons
             for config_file in self.config_files:
@@ -853,7 +1003,7 @@ class ClaudeConfigSwitcher:
             )
 
             # Update action buttons
-            self.switch_btn.configure(text="切换至配置", command=self.switch_to_selected_config)
+            self.switch_btn.configure(text="切换至配置", command=self.switch_to_managed_config)
             self.config_manager_btn.configure(state="normal")
 
     def refresh_managed_configs(self):
@@ -869,64 +1019,31 @@ class ClaudeConfigSwitcher:
     def create_managed_config_item(self, config):
         """Create a managed configuration item"""
         item_frame = ctk.CTkFrame(self.managed_configs_list, fg_color=COLORS["bg_primary"])
-        item_frame.pack(fill="x", pady=2, padx=2)
+        item_frame.pack(fill="x", pady=1, padx=2)
 
-        # Config content
+        # Config content - simplified layout
         content_frame = ctk.CTkFrame(item_frame, fg_color="transparent")
-        content_frame.pack(fill="x", padx=10, pady=8)
+        content_frame.pack(fill="x", padx=8, pady=4)
 
-        # Header with name and status
-        header_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-        header_frame.pack(fill="x")
-
-        # Config name
+        # Config name and status in one line
         name_label = ctk.CTkLabel(
-            header_frame,
+            content_frame,
             text=config["name"],
-            font=self.get_font(size=13, weight="bold"),
+            font=self.get_font(size=12),
             text_color=COLORS["text_primary"],
             anchor="w"
         )
-        name_label.pack(side="left")
+        name_label.pack(side="left", fill="x", expand=True)
 
         # Active indicator
         if config["name"] == self.configs_data.get("active_config"):
             active_label = ctk.CTkLabel(
-                header_frame,
-                text="活跃",
-                font=self.get_font(size=10, weight="bold"),
-                text_color="white",
-                fg_color=COLORS["success_green"],
-                corner_radius=3
+                content_frame,
+                text="●",
+                font=self.get_font(size=12, weight="bold"),
+                text_color=COLORS["success_green"]
             )
-            active_label.pack(side="right", padx=(0, 5))
-
-        # Model and URL info
-        info_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-        info_frame.pack(fill="x", pady=(5, 0))
-
-        model_label = ctk.CTkLabel(
-            info_frame,
-            text=f"模型: {config['default_model']}",
-            font=self.get_font(size=11),
-            text_color=COLORS["text_secondary"],
-            anchor="w"
-        )
-        model_label.pack(anchor="w")
-
-        # Truncate URL if too long
-        url = config["ANTHROPIC_BASE_URL"]
-        if len(url) > 35:
-            url = url[:32] + "..."
-
-        url_label = ctk.CTkLabel(
-            info_frame,
-            text=f"URL: {url}",
-            font=self.get_font(size=11),
-            text_color=COLORS["text_secondary"],
-            anchor="w"
-        )
-        url_label.pack(anchor="w")
+            active_label.pack(side="right", padx=(5, 0))
 
         # Click handlers
         def on_click(event, cfg=config):
@@ -934,10 +1051,13 @@ class ClaudeConfigSwitcher:
 
         def on_double_click(event, cfg=config):
             self.select_managed_config(cfg)
-            self.switch_to_selected_config()
+            self.switch_to_managed_config()
 
         # Bind events
-        widgets_to_bind = [item_frame, content_frame, header_frame, name_label, info_frame, model_label, url_label]
+        widgets_to_bind = [item_frame, content_frame, name_label]
+        if 'active_label' in locals():
+            widgets_to_bind.append(active_label)
+
         for widget in widgets_to_bind:
             widget.bind("<Button-1>", on_click)
             widget.bind("<Double-Button-1>", on_double_click)
@@ -1061,7 +1181,7 @@ class ClaudeConfigSwitcher:
         self.status_label.configure(text_color=COLORS["text_muted"])
 
         # Update action buttons
-        action_buttons = [self.switch_btn, self.refresh_btn, self.open_dir_btn, self.config_manager_btn, self.api_test_btn]
+        action_buttons = [self.switch_btn, self.refresh_btn, self.open_dir_btn, self.config_manager_btn, self.api_test_btn, self.switch_env_btn]
         for btn in action_buttons:
             if btn == self.config_manager_btn:
                 btn.configure(
@@ -1073,6 +1193,12 @@ class ClaudeConfigSwitcher:
                 btn.configure(
                     fg_color=COLORS["warning_orange"],
                     hover_color="#e68900",
+                    text_color="white"
+                )
+            elif btn == self.switch_env_btn:
+                btn.configure(
+                    fg_color=COLORS["success_green"],
+                    hover_color="#45a049",
                     text_color="white"
                 )
             else:
