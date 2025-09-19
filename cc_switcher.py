@@ -12,62 +12,62 @@ import winreg
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("dark-blue")
 
-# Modern card-style color schemes
+# 现代卡片式配色方案
 DARK_COLORS = {
-    "bg_primary": "#1a1a1a",  # Dark background
-    "bg_secondary": "#2b2b2b",  # Card background
-    "bg_tertiary": "#333333",  # Elevated card background
-    "card_hover": "#3a3a3a",  # Card hover state
-    "border": "#404040",  # Subtle border
-    "shadow": "#000000",  # Card shadow
-    "text_primary": "#ffffff",  # Primary text
-    "text_secondary": "#b3b3b3",  # Secondary text
-    "text_muted": "#666666",  # Muted text
-    "accent_primary": "#4a90e2",  # Softer blue accent
-    "accent_hover": "#357abd",  # Softer blue hover
-    "accent_red": "#ff6b6b",  # Error/active state
-    "accent_red_hover": "#ff5252",  # Error hover
-    "success_green": "#4caf50",  # Success state
-    "warning_orange": "#ff9800",  # Warning state
+    "bg_primary": "#1a1a1a",  # 深色背景
+    "bg_secondary": "#2b2b2b",  # 卡片背景
+    "bg_tertiary": "#333333",  # 高亮卡片背景
+    "card_hover": "#3a3a3a",  # 卡片悬停状态
+    "border": "#404040",  # 微妙边框
+    "shadow": "#000000",  # 卡片阴影
+    "text_primary": "#ffffff",  # 主要文本
+    "text_secondary": "#b3b3b3",  # 次要文本
+    "text_muted": "#666666",  # 静音文本
+    "accent_primary": "#4a90e2",  # 柔和蓝色强调
+    "accent_hover": "#357abd",  # 柔和蓝色悬停
+    "accent_red": "#ff6b6b",  # 错误/活动状态
+    "accent_red_hover": "#ff5252",  # 错误悬停
+    "success_green": "#4caf50",  # 成功状态
+    "warning_orange": "#ff9800",  # 警告状态
 }
 
 LIGHT_COLORS = {
-    "bg_primary": "#f8f8f6",  # Warm, eye-friendly background
-    "bg_secondary": "#fefffe",  # Soft white with warm undertone
-    "bg_tertiary": "#f3f4f2",  # Elevated background with subtle contrast
-    "card_hover": "#eef1ee",  # Gentle hover effect
-    "border": "#d0d7de",  # Professional border color
-    "shadow": "#eaeef2",  # Soft shadow color
-    "text_primary": "#24292f",  # High contrast primary text
-    "text_secondary": "#57606a",  # Well-balanced secondary text
-    "text_muted": "#8c959f",  # Properly muted text
-    "accent_primary": "#5a9fd4",  # Softer, more elegant blue
-    "accent_hover": "#4a8bc2",  # Corresponding softer hover
-    "accent_red": "#d1242f",  # Professional red for errors/active
-    "accent_red_hover": "#cf222e",  # Corresponding hover state
-    "success_green": "#1a7f37",  # Professional success green
-    "warning_orange": "#d97916",  # Balanced warning orange
+    "bg_primary": "#f8f8f6",  # 温暖护眼背景
+    "bg_secondary": "#fefffe",  # 柔和白色带温色调
+    "bg_tertiary": "#f3f4f2",  # 高亮背景带微妙对比
+    "card_hover": "#eef1ee",  # 温和悬停效果
+    "border": "#d0d7de",  # 专业边框颜色
+    "shadow": "#eaeef2",  # 柔和阴影颜色
+    "text_primary": "#24292f",  # 高对比主要文本
+    "text_secondary": "#57606a",  # 平衡次要文本
+    "text_muted": "#8c959f",  # 适度静音文本
+    "accent_primary": "#5a9fd4",  # 柔和优雅蓝色
+    "accent_hover": "#4a8bc2",  # 对应柔和悬停
+    "accent_red": "#d1242f",  # 专业红色用于错误/活动
+    "accent_red_hover": "#cf222e",  # 对应悬停状态
+    "success_green": "#1a7f37",  # 专业成功绿色
+    "warning_orange": "#d97916",  # 平衡警告橙色
 }
 
-# Default to dark theme
+# 默认为暗色主题
 COLORS = DARK_COLORS
 
 
 class ClaudeConfigSwitcher:
     def __init__(self):
         self.root = ctk.CTk()
-        # Configure window properties
+        # 配置窗口属性
         self.root.configure(fg_color=COLORS["bg_primary"])
         self.root.title("CC 配置切换器")
 
-        # Keep system window but make it resizable and with proper taskbar behavior
+        # 保持系统窗口但使其可调整大小并具有适当的任务栏行为
         self.root.resizable(True, True)
 
-        # Set initial size
+        # 设置初始大小
         window_width = 900
         window_height = 430
 
-        # Get screen dimensions and center the window
+        # 获取屏幕尺寸并居中窗口
         self.root.update_idletasks()
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
@@ -85,22 +85,23 @@ class ClaudeConfigSwitcher:
         self.configs_data = self.load_configs_data()
         self.current_config_name = None
 
-        # Initialize theme from saved state
+        # 从保存的状态初始化主题
         self.init_theme()
 
-        # Setup fonts for better Chinese support
+        # 设置字体以更好地支持中文
         self.setup_fonts()
 
-        # Initialize UI after all variables are set
+        # 在设置所有变量后初始化UI
         self.setup_ui()
 
-        # Apply theme colors after UI is created
+        # 在创建UI后应用主题颜色
         if ctk.get_appearance_mode() == "Light":
             self.apply_theme_colors()
 
-        # Use after_idle to ensure UI is ready before refreshing
+        # 使用after_idle确保UI准备就绪后再刷新
         self.root.after_idle(lambda: self.refresh_config_list(is_initial=True))
         self.root.after_idle(lambda: self.refresh_managed_configs())
+        self.root.after_idle(lambda: self.switch_tab("configs"))
 
     def init_theme(self):
         """Initialize theme from saved state"""
@@ -135,7 +136,7 @@ class ClaudeConfigSwitcher:
         try:
             self.claude_dir.mkdir(exist_ok=True)
 
-            # Load existing state
+            # 加载现有状态
             state = {'last_selected_file': None, 'theme_mode': 'dark', 'config_methods': ['file']}
             if self.app_state_file.exists():
                 try:
@@ -144,7 +145,7 @@ class ClaudeConfigSwitcher:
                 except (json.JSONDecodeError, IOError):
                     pass
 
-            # Update with new values if provided
+            # 如果提供了新值则更新
             if selected_file_name is not None:
                 state['last_selected_file'] = selected_file_name
             if theme_mode is not None:
@@ -159,55 +160,55 @@ class ClaudeConfigSwitcher:
 
     def setup_fonts(self):
         """Setup fonts with better Chinese character support"""
-        # Define font families in order of preference
+        # 按优先级顺序定义字体系列
         self.chinese_fonts = [
-            "Microsoft YaHei UI",  # Windows 10/11 preferred
-            "Microsoft YaHei",     # Windows general
-            "PingFang SC",         # macOS preferred
-            "PingFang HK",         # macOS Hong Kong
-            "PingFang TC",         # macOS Taiwan
+            "Microsoft YaHei UI",  # Windows 10/11 首选
+            "Microsoft YaHei",     # Windows 通用
+            "PingFang SC",         # macOS 首选
+            "PingFang HK",         # macOS 香港
+            "PingFang TC",         # macOS 台湾
             "Noto Sans CJK SC",    # Linux/macOS
             "Noto Sans CJK TC",    # Linux/macOS
             "Source Han Sans SC",  # Linux/macOS
             "Source Han Sans TC",  # Linux/macOS
-            "SimSun",             # Windows fallback
-            "SimHei",             # Windows fallback
-            "KaiTi",              # Windows fallback
-            "FangSong",           # Windows fallback
-            "Arial Unicode MS",   # Cross-platform fallback
-            "Segoe UI",           # Default Windows font
-            "Arial",              # Universal fallback
-            "Helvetica",          # Universal fallback
+            "SimSun",             # Windows 后备
+            "SimHei",             # Windows 后备
+            "KaiTi",              # Windows 后备
+            "FangSong",           # Windows 后备
+            "Arial Unicode MS",   # 跨平台后备
+            "Segoe UI",           # 默认Windows字体
+            "Arial",              # 通用后备
+            "Helvetica",          # 通用后备
         ]
 
-        # Find the best available Chinese font
+        # 找到最佳可用中文字体
         self.best_chinese_font = self.find_best_font()
 
     def find_best_font(self):
         """Find the best available Chinese font"""
-        # Simple approach - try the most common Windows Chinese fonts first
+        # 简单方法 - 首先尝试最常见的Windows中文字体
         try:
-            # Check for Microsoft YaHei UI (Windows 10/11 default)
+            # 检查Microsoft YaHei UI (Windows 10/11 默认)
             ctk.CTkFont(family="Microsoft YaHei UI", size=10)
             return "Microsoft YaHei UI"
         except:
             pass
 
         try:
-            # Check for Microsoft YaHei (Windows general)
+            # 检查Microsoft YaHei (Windows 通用)
             ctk.CTkFont(family="Microsoft YaHei", size=10)
             return "Microsoft YaHei"
         except:
             pass
 
         try:
-            # Check for SimSun (Windows fallback)
+            # 检查SimSun (Windows 后备)
             ctk.CTkFont(family="SimSun", size=10)
             return "SimSun"
         except:
             pass
 
-        # Fallback to default
+        # 后备到默认字体
         return "Segoe UI"
 
     def get_font(self, size=12, weight="normal"):
@@ -225,24 +226,24 @@ class ClaudeConfigSwitcher:
         )
 
     def setup_ui(self):
-        # --- Main Content Area ---
+        # --- 主内容区域 ---
         content_frame = ctk.CTkFrame(self.root, fg_color="transparent")
         content_frame.pack(fill="both", expand=True, padx=3, pady=3)
 
-        # --- Toolbar (leftmost panel) ---
+        # --- 工具栏（最左侧面板）---
         self.toolbar = ctk.CTkFrame(content_frame, width=30, corner_radius=0, fg_color=COLORS["bg_secondary"])
         self.toolbar.pack(side="left", fill="y", pady=0, padx=(0, 0.5))
         self.toolbar.pack_propagate(False)
 
-        # --- Toolbar Content ---
+        # --- 工具栏内容 ---
         toolbar_container = ctk.CTkFrame(self.toolbar, fg_color="transparent")
         toolbar_container.pack(fill="both", expand=True, padx=2, pady=8)
 
-        # Top button container for sync button
+        # 同步按钮的顶部按钮容器
         top_container = ctk.CTkFrame(toolbar_container, fg_color="transparent")
         top_container.pack(side="top")
 
-        # WebDAV sync button (sun behind cloud icon) - at the very top
+        # WebDAV同步按钮（云后太阳图标）- 在最顶部
         self.sync_btn = ctk.CTkButton(
             top_container,
             text="🌥",
@@ -258,13 +259,13 @@ class ClaudeConfigSwitcher:
         )
         self.sync_btn.pack(pady=(0, 8))
 
-        # Bottom button container to push buttons to bottom
+        # 底部按钮容器将按钮推到底部
         button_container = ctk.CTkFrame(toolbar_container, fg_color="transparent")
         button_container.pack(side="bottom")
 
-        # Settings button will be created after right_panel is initialized
+        # 设置按钮将在right_panel初始化后创建
 
-        # Theme toggle button (sun/moon icon) - above settings
+        # 主题切换按钮（太阳/月亮图标）- 在设置上方
         initial_theme_icon = "☀" if ctk.get_appearance_mode() == "Light" else "🌙"
         self.theme_btn = ctk.CTkButton(
             button_container,
@@ -449,7 +450,7 @@ class ClaudeConfigSwitcher:
         self.managed_configs_list.pack(fill="both", expand=True, padx=5, pady=5)
 
         # Current active tab
-        self.active_tab = "files"
+        self.active_tab = "configs"
 
         # --- Right Panel (Preview) ---
         self.right_panel = ctk.CTkFrame(content_frame, corner_radius=0, fg_color=COLORS["bg_secondary"])
@@ -1287,7 +1288,7 @@ class ClaudeConfigSwitcher:
         """WebDAV synchronization functionality"""
         self.update_status("WebDAV sync feature coming soon", COLORS["text_muted"])
 
-    # Configuration Management Methods
+    # 配置管理方法
     def load_configs_data(self) -> Dict[str, Any]:
         """Load configurations from JSON file"""
         default_data = {
@@ -1332,7 +1333,7 @@ class ClaudeConfigSwitcher:
     def test_config(self, base_url: str, auth_token: str, model: str) -> tuple[bool, str]:
         """Test if a configuration is valid by making a test API call - Full Claude Code CLI compatibility"""
         try:
-            # Use exact Claude Code CLI headers from actual implementation
+            # 使用与Claude Code CLI完全相同的头信息
             headers = {
                 "content-type": "application/json",
                 "anthropic-version": "2023-06-01",
@@ -1350,11 +1351,11 @@ class ClaudeConfigSwitcher:
 
             url = f"{base_url.rstrip('/')}/v1/messages"
 
-            # Use requests.Session for better connection handling like Claude Code
+            # 使用requests.Session以获得更好的连接处理，就像Claude Code一样
             session = requests.Session()
             session.headers.update(headers)
 
-            # Remove debug output for normal operation
+            # 移除正常操作的调试输出
             # print(f"Config Test Debug:")
             # print(f"URL: {url}")
             # print(f"Headers: {dict(session.headers)}")
