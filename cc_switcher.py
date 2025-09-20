@@ -271,11 +271,27 @@ class SimpleConfigManager:
     def get_available_models(self):
         """获取可用模型列表"""
         return [
+            # 带版本日期的Claude模型
             "claude-sonnet-4-20250514",
             "claude-3-5-sonnet-20241022",
             "claude-3-5-haiku-20241022",
             "claude-3-haiku-20240307",
-            "claude-3-opus-20240229"
+            "claude-3-opus-20240229",
+
+            # 不带版本日期的Claude模型
+            "claude-sonnet",
+            "claude-haiku",
+            "claude-opus",
+
+            # Claude thinking模型
+            "claude-sonnet-think",
+            "claude-haiku-think",
+            "claude-opus-think",
+
+            # 智谱AI模型
+            "glm-4.5",
+            "glm-4",
+            "glm-3-turbo"
         ]
 
     def get_claude_code_projects(self):
@@ -366,11 +382,10 @@ class ConfigManagementFrame(wx.Frame):
     """API配置管理主窗口"""
 
     def __init__(self):
-        super().__init__(None, title="CC-APISwitch v1.0", size=(900, 600))
+        super().__init__(None, title="CC-APISwitch v1.0", size=(900, 700))  # 调整窗口高度
         self.config_manager = SimpleConfigManager()
         self.selected_index = -1
         self.testing_indices = set()  # 正在测试的配置索引
-        self.is_adding = False  # 是否处于添加模式
 
         self.create_ui()
         self.refresh_list()
@@ -402,7 +417,7 @@ class ConfigManagementFrame(wx.Frame):
         self.config_list.AppendColumn('状态', width=80)
         self.config_list.AppendColumn('测试时间', width=80)
         self.config_list.AppendColumn('测试结果', width=300)
-        main_sizer.Add(self.config_list, 1, wx.ALL | wx.EXPAND, 10)
+        main_sizer.Add(self.config_list, 3, wx.ALL | wx.EXPAND, 10)
 
         # 配置编辑区域
         edit_box = wx.StaticBox(panel, label="API配置编辑")
@@ -440,34 +455,32 @@ class ConfigManagementFrame(wx.Frame):
         form_sizer.Add(self.note_text, 1, wx.EXPAND)
 
         edit_sizer.Add(form_sizer, 0, wx.ALL | wx.EXPAND, 10)
-        main_sizer.Add(edit_sizer, 0, wx.ALL | wx.EXPAND, 10)
+        main_sizer.Add(edit_sizer, 2, wx.ALL | wx.EXPAND, 10)  # 减少编辑区域的垂直比例
 
         # 操作按钮区域
         btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         self.add_btn = wx.Button(panel, label="添加")
         self.update_btn = wx.Button(panel, label="更新")
-        self.save_btn = wx.Button(panel, label="保存")
-        self.cancel_btn = wx.Button(panel, label="取消")
         self.delete_btn = wx.Button(panel, label="删除")
         self.test_btn = wx.Button(panel, label="测试")
         self.batch_test_btn = wx.Button(panel, label="批量测试")
         self.switch_btn = wx.Button(panel, label="切换配置")
         self.env_btn = wx.Button(panel, label="环境变量")
+        self.clear_btn = wx.Button(panel, label="清除")
 
-        btn_sizer.Add(self.add_btn, 0, wx.ALL, 5)
-        btn_sizer.Add(self.update_btn, 0, wx.ALL, 5)
-        btn_sizer.Add(self.save_btn, 0, wx.ALL, 5)
-        btn_sizer.Add(self.cancel_btn, 0, wx.ALL, 5)
-        btn_sizer.Add(self.delete_btn, 0, wx.ALL, 5)
-        btn_sizer.AddSpacer(20)
-        btn_sizer.Add(self.test_btn, 0, wx.ALL, 5)
-        btn_sizer.Add(self.batch_test_btn, 0, wx.ALL, 5)
-        btn_sizer.AddSpacer(20)
-        btn_sizer.Add(self.switch_btn, 0, wx.ALL, 5)
-        btn_sizer.Add(self.env_btn, 0, wx.ALL, 5)
+        btn_sizer.Add(self.add_btn, 0, wx.ALL, 2)
+        btn_sizer.Add(self.update_btn, 0, wx.ALL, 2)
+        btn_sizer.Add(self.delete_btn, 0, wx.ALL, 2)
+        btn_sizer.Add(self.clear_btn, 0, wx.ALL, 2)
+        btn_sizer.AddSpacer(10)
+        btn_sizer.Add(self.test_btn, 0, wx.ALL, 2)
+        btn_sizer.Add(self.batch_test_btn, 0, wx.ALL, 2)
+        btn_sizer.AddSpacer(10)
+        btn_sizer.Add(self.switch_btn, 0, wx.ALL, 2)
+        btn_sizer.Add(self.env_btn, 0, wx.ALL, 2)
 
-        main_sizer.Add(btn_sizer, 0, wx.ALL | wx.CENTER, 10)
+        main_sizer.Add(btn_sizer, 0, wx.ALL | wx.CENTER, 5)
 
         # 项目管理区域
         project_box = wx.StaticBox(panel, label="项目快速启动")
@@ -512,9 +525,8 @@ class ConfigManagementFrame(wx.Frame):
         self.config_list.Bind(wx.EVT_MOTION, self.on_list_motion)
         self.add_btn.Bind(wx.EVT_BUTTON, self.on_add)
         self.update_btn.Bind(wx.EVT_BUTTON, self.on_update)
-        self.save_btn.Bind(wx.EVT_BUTTON, self.on_save)
-        self.cancel_btn.Bind(wx.EVT_BUTTON, self.on_cancel)
         self.delete_btn.Bind(wx.EVT_BUTTON, self.on_delete)
+        self.clear_btn.Bind(wx.EVT_BUTTON, self.on_clear)  # 绑定清除按钮事件
         self.test_btn.Bind(wx.EVT_BUTTON, self.on_test)
         self.batch_test_btn.Bind(wx.EVT_BUTTON, self.on_batch_test)
         self.switch_btn.Bind(wx.EVT_BUTTON, self.on_switch)
@@ -525,8 +537,6 @@ class ConfigManagementFrame(wx.Frame):
         self.open_claude_btn.Bind(wx.EVT_BUTTON, self.on_open_claude)
         self.open_claude_c_btn.Bind(wx.EVT_BUTTON, self.on_open_claude_c)
 
-        # 初始按钮状态
-        self.update_button_states()
         self.update_config_display()
         self.refresh_projects()  # 初始化项目列表
 
@@ -567,32 +577,6 @@ class ConfigManagementFrame(wx.Frame):
             self.config_list.SetToolTip("")
 
         event.Skip()
-
-    def update_button_states(self):
-        """更新按钮状态"""
-        if self.is_adding:
-            # 添加模式：显示保存和取消，隐藏其他
-            self.add_btn.Hide()
-            self.update_btn.Hide()
-            self.save_btn.Show()
-            self.cancel_btn.Show()
-            self.delete_btn.Enable(False)
-            self.test_btn.Enable(False)
-            self.switch_btn.Enable(False)
-            self.env_btn.Enable(False)
-        else:
-            # 正常模式
-            self.add_btn.Show()
-            self.update_btn.Show()
-            self.save_btn.Hide()
-            self.cancel_btn.Hide()
-            self.delete_btn.Enable(True)
-            self.test_btn.Enable(True)
-            self.switch_btn.Enable(True)
-            self.env_btn.Enable(True)
-
-        # 更新布局
-        self.Layout()
 
     def refresh_list(self):
         """刷新配置列表"""
@@ -651,11 +635,6 @@ class ConfigManagementFrame(wx.Frame):
 
     def on_select(self, event):
         """选择配置"""
-        # 如果正在添加模式，不允许选择其他配置
-        if self.is_adding:
-            event.Skip()
-            return
-
         self.selected_index = event.GetIndex()
         if self.selected_index >= 0:
             configs = self.config_manager.get_all_configs()
@@ -664,20 +643,8 @@ class ConfigManagementFrame(wx.Frame):
                 self.status_text.SetLabel(f"已选择配置: {configs[self.selected_index]['name']}")
 
     def on_add(self, event):
-        """添加配置 - 进入添加模式"""
-        self.is_adding = True
-        self.selected_index = -1
-        self.clear_form()
-        self.update_button_states()
-        self.status_text.SetLabel("添加新配置 - 请填写信息后点击保存")
-        # 焦点到名称输入框
-        self.name_text.SetFocus()
-
-    def on_save(self, event):
-        """保存新配置"""
-        if not self.is_adding:
-            return
-
+        """添加配置 - 直接保存配置内容"""
+        # 直接保存配置，不需要进入添加模式
         name = self.name_text.GetValue().strip()
         url = self.url_text.GetValue().strip()
         token = self.token_text.GetValue().strip()
@@ -688,29 +655,29 @@ class ConfigManagementFrame(wx.Frame):
             wx.MessageBox("请填写所有必填字段", "提示", wx.OK | wx.ICON_INFORMATION)
             return
 
+        # 检查是否已存在同名配置
+        configs = self.config_manager.get_all_configs()
+        for config in configs:
+            if config["name"] == name:
+                wx.MessageBox(f"配置名称 '{name}' 已存在，请使用其他名称", "提示", wx.OK | wx.ICON_INFORMATION)
+                return
+
         success, message = self.config_manager.add_config(name, url, token, model, note)
         if success:
             self.status_text.SetLabel(message)
             self.refresh_list()
-            self.is_adding = False
-            self.update_button_states()
             self.clear_form()
         else:
             wx.MessageBox(message, "错误", wx.OK | wx.ICON_ERROR)
 
-    def on_cancel(self, event):
-        """取消添加"""
-        self.is_adding = False
-        self.update_button_states()
+    def on_clear(self, event):
+        """清除表单内容"""
         self.clear_form()
-        self.status_text.SetLabel("已取消添加")
+        self.selected_index = -1
+        self.status_text.SetLabel("已清除表单内容")
 
     def on_update(self, event):
         """更新配置"""
-        if self.is_adding:
-            wx.MessageBox("请先完成添加操作", "提示", wx.OK | wx.ICON_INFORMATION)
-            return
-
         if self.selected_index < 0:
             wx.MessageBox("请先选择一个配置", "提示", wx.OK | wx.ICON_INFORMATION)
             return
@@ -735,10 +702,6 @@ class ConfigManagementFrame(wx.Frame):
 
     def on_delete(self, event):
         """删除配置"""
-        if self.is_adding:
-            wx.MessageBox("请先完成添加操作", "提示", wx.OK | wx.ICON_INFORMATION)
-            return
-
         if self.selected_index < 0:
             wx.MessageBox("请先选择一个配置", "提示", wx.OK | wx.ICON_INFORMATION)
             return
@@ -864,9 +827,22 @@ class ConfigManagementFrame(wx.Frame):
 
     def refresh_projects(self):
         """刷新项目列表"""
-        projects = self.config_manager.get_claude_code_projects()
         self.project_choice.Clear()
+        self.project_choice.Append("正在加载项目...")
+        self.project_choice.SetSelection(0)
+        self.status_text.SetLabel("正在加载项目列表...")
+        
+        # 使用后台线程加载项目，避免阻塞UI
+        def load_projects():
+            projects = self.config_manager.get_claude_code_projects()
+            wx.CallAfter(self.update_projects_ui, projects)
+            
+        threading.Thread(target=load_projects, daemon=True).start()
 
+    def update_projects_ui(self, projects):
+        """在UI线程中更新项目列表"""
+        self.project_choice.Clear()
+        
         # 存储项目数据
         self.projects_data = projects
 
