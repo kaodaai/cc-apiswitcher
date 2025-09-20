@@ -24,7 +24,22 @@ class SimpleConfigManager:
     def __init__(self):
         self.claude_dir = Path.home() / ".claude"
         self.settings_file = self.claude_dir / "settings.json"
+
+        # 优先使用新的配置文件名，如果不存在则尝试旧文件名
         self.configs_file = self.claude_dir / "cc_apiswitch_configs.json"
+        old_configs_file = self.claude_dir / "cc_switcher_configs.json"
+
+        # 如果新文件不存在但旧文件存在，则迁移配置
+        if not self.configs_file.exists() and old_configs_file.exists():
+            import shutil
+            try:
+                shutil.copy2(old_configs_file, self.configs_file)
+                print(f"已迁移配置文件: {old_configs_file} -> {self.configs_file}")
+            except Exception as e:
+                print(f"迁移配置文件失败: {e}")
+                # 如果迁移失败，继续使用旧文件
+                self.configs_file = old_configs_file
+
         self.configs_data = self.load_configs_data()
 
     def load_configs_data(self):
