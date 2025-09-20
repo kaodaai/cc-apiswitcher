@@ -50,7 +50,7 @@ def build_main():
     result = os.system(" ".join(build_args))
 
     if result == 0:
-        print("\n✅ CC-APISwitch v1.0 构建成功!")
+        print("\n[SUCCESS] CC-APISwitch v1.0 构建成功!")
 
         # 检查文件大小
         main_path = Path("dist/CC-APISwitch.exe")
@@ -59,10 +59,10 @@ def build_main():
             print(f"文件大小: {size_mb:.1f} MB")
             print(f"输出位置: {main_path.absolute()}")
 
-        print("\n🎉 构建完成! 可执行文件已生成到 dist/ 目录")
+        print("\n[COMPLETE] 构建完成! 可执行文件已生成到 dist/ 目录")
         return True
     else:
-        print("\n❌ 构建失败!")
+        print("\n[FAILED] 构建失败!")
         return False
 
 
@@ -84,7 +84,7 @@ def clean_old_builds():
             cleaned += 1
 
     if cleaned > 0:
-        print(f"✅ 清理了 {cleaned} 个旧构建目录")
+        print(f"[CLEANED] 清理了 {cleaned} 个旧构建目录")
     else:
         print("没有需要清理的旧构建目录")
 
