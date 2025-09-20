@@ -1,141 +1,198 @@
-# Claude Code 配置切换器
+# CC配置切换器 v1.0
+
+🎯 **一个专注、高效、易用的Claude CLI配置管理工具**
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11+-blue.svg" alt="Python">
   <img src="https://img.shields.io/badge/Platform-Windows-lightgrey.svg" alt="Platform">
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
-  <img src="https://img.shields.io/badge/GUI-CustomTkinter-orange.svg" alt="GUI">
+  <img src="https://img.shields.io/badge/GUI-wxPython-orange.svg" alt="GUI">
+  <img src="https://img.shields.io/badge/Version-1.0-green.svg" alt="Version">
 </p>
 
-一个现代化、用户友好的桌面应用程序，用于管理多个 Claude CLI 配置文件，轻松在不同的 Claude Code 配置之间切换。
+## ✨ 功能特色
 
-## ✨ 主要功能
+### 🔧 配置管理
+- **添加配置** - 简单快捷的配置添加流程
+- **编辑配置** - 选中配置即可就地编辑
+- **删除配置** - 安全的配置删除确认
+- **配置切换** - 一键切换活跃配置
+- **环境变量** - 快速设置系统环境变量
 
-- 🔄 **轻松切换配置** - 一键切换 Claude Code 配置文件
-- 👁️ **实时预览** - 切换前预览配置内容
-- 🎯 **智能识别** - 可视化指示器显示活动和同步状态
-- 🗂️ **有序管理** - 简洁现代的界面管理多个配置
-- 🌙 **深色主题** - 专业的深色主题与现代样式
-- 💨 **轻量快速** - 快速响应的桌面应用程序
+### 🧪 API测试
+- **单个测试** - 验证指定配置的API连通性
+- **批量测试** - 一键测试所有配置
+- **状态追踪** - 实时显示测试状态和结果
+- **结果持久化** - 测试结果自动保存显示
 
+### 🎨 界面设计
+- **单一窗口** - 所有功能集中在一个界面
+- **多列显示** - 配置信息一目了然
+- **智能状态** - 颜色编码区分配置状态
+- **实时反馈** - 操作状态即时更新
+
+## 🖼️ 界面预览
+
+```
+┌─────────────── CC配置切换器 v1.0 ───────────────┐
+│                                                │
+│  配置名称    │  模型      │ 状态 │时间│ 测试结果  │
+│  ─────────────────────────────────────────────  │
+│  prod-config │ sonnet-4   │ 通过 │15:30│ 正常    │
+│  test-config │ haiku      │ 失败 │15:25│ 认证错误 │
+│  dev-config  │ sonnet-3.5 │未测试│     │         │
+│                                                │
+│ ┌────────────── 配置编辑 ──────────────────────┐ │
+│ │ 配置名称: [prod-config               ] │ │
+│ │ 基础URL:  [https://api.anthropic.com   ] │ │
+│ │ 认证令牌: [*************************] │ │
+│ │ 默认模型: [claude-sonnet-4-20250514  ▼] │ │
+│ └─────────────────────────────────────────────┘ │
+│                                                │
+│ [添加] [更新] [删除]   [测试] [批量测试]  [切换][环境] │
+│                                                │
+│ 状态: 就绪                                      │
+└────────────────────────────────────────────────┘
+```
 
 ## 🚀 快速开始
 
-### 下载运行
-
-1. **下载** 最新版本 [发布页面](../../releases)
-2. **运行** `cc-switcher.exe`
-
-### 从源码运行
-
+### 运行程序
 ```bash
-# 克隆仓库
-git clone https://github.com/x-sunny43/cc-switcher.git
-cd claude-config-switcher
-
-# 安装依赖
-uv sync
-
-# 运行应用
+# 开发模式
 python cc_switcher.py
+
+# 或运行可执行文件
+./CCSwicher.exe
 ```
 
-## 📦 从源码构建
-
-我们提供多种构建可执行文件的方式：
-
-### 方法一：自动构建脚本（推荐）
+### 构建可执行文件
 ```bash
-python build_exe.py
+# 构建主版本
+python build.py
+
+# 清理旧构建文件
+python build.py clean
 ```
 
-### 方法二：批处理脚本（Windows）
+### 基本使用
+1. **添加配置** - 点击"添加"按钮，填写配置信息
+2. **测试配置** - 选择配置后点击"测试"验证API
+3. **切换配置** - 选择配置后点击"切换配置"设为活跃
+4. **批量测试** - 点击"批量测试"验证所有配置
+
+## 📋 系统要求
+
+### 运行环境
+- **操作系统**: Windows 10/11
+- **Python**: 3.11+ (开发模式)
+- **依赖包**: wxpython, requests (开发模式)
+
+### 可执行文件
+- **大小**: ~18.5MB
+- **依赖**: 无需Python环境
+- **启动**: 双击即可运行
+
+## 🔧 开发构建
+
+### 安装依赖
 ```bash
-# 双击运行或命令行执行
-build.bat
+pip install wxpython>=4.2.0 requests>=2.31.0 pyinstaller>=6.14.2
 ```
 
-### 方法三：手动构建
-```bash
-pip install pyinstaller
-pyinstaller --onefile --windowed --name ClaudeConfigSwitcher cc_switcher.py
+### 项目结构
+```
+cc-switcher/
+├── cc_switcher.py              # 主程序 v1.0
+├── build.py                    # 构建脚本
+├── README.md                   # 项目文档
+└── pyproject.toml              # 项目配置
 ```
 
-生成的可执行文件位于 `dist/` 目录中。
+## 📊 技术架构
 
-## 🎯 工作原理
-
-1. **扫描**：应用自动扫描 `~/.claude` 目录中的配置文件
-2. **预览**：点击任意配置文件预览其内容
-3. **切换**：点击"切换"按钮激活选中的配置
-4. **备份**：自动备份之前的设置并添加时间戳
-
-## 🔧 系统要求
-
-- **Python 3.11+**（从源码运行时需要）
-- **Windows 10/11**（主要支持平台）
-- **~/.claude 目录** 包含 Claude CLI 配置文件
-
-### 开发依赖
-- `customtkinter >= 5.2.2` - 现代化 GUI 框架
-- `pyinstaller >= 6.14.2` - 构建可执行文件
-
-## 📁 项目结构
-
+### 核心组件
 ```
-claude-config-switcher/
-├── cc_switcher.py          # 主应用程序
-├── build_exe.py            # 构建脚本
-├── build.bat               # Windows 构建包装器
-├── pyproject.toml          # 项目配置
-├── README.md               # 本文件
-└── CLAUDE.md               # 开发指南
+ConfigManager          # 配置管理核心
+├── 配置CRUD操作        # 增删改查
+├── API测试功能         # 单个和批量测试
+├── 状态持久化          # 测试结果保存
+└── 环境变量管理        # 系统集成
+
+ConfigManagementFrame   # 主界面
+├── 多列配置列表        # 信息展示
+├── 配置编辑区域        # 表单编辑
+├── 操作按钮组          # 功能入口
+└── 状态反馈栏          # 操作提示
 ```
 
-## 🤝 参与贡献
-
-欢迎贡献代码！以下是参与方式：
-
-1. **Fork** 本仓库
-2. **创建** 功能分支（`git checkout -b feature/amazing-feature`）
-3. **提交** 更改（`git commit -m 'Add amazing feature'`）
-4. **推送** 到分支（`git push origin feature/amazing-feature`）
-5. **创建** Pull Request
-
-### 开发环境设置
-
-```bash
-# 克隆你的 fork
-git clone https://github.com/your-username/claude-config-switcher.git
-cd claude-config-switcher
-
-# 安装开发依赖
-pip install -e .
-
-# 运行应用
-python cc_switcher.py
+### 数据结构
+```json
+{
+  "configs": [
+    {
+      "name": "配置名称",
+      "ANTHROPIC_BASE_URL": "https://api.anthropic.com",
+      "ANTHROPIC_AUTH_TOKEN": "sk-ant-...",
+      "default_model": "claude-sonnet-4-20250514",
+      "test_status": "通过",
+      "test_time": "15:30:25",
+      "test_message": "Q:测试 A:正常响应"
+    }
+  ],
+  "active_config": "配置名称",
+  "version": "1.0"
+}
 ```
 
-## 🐛 Bug 报告与功能请求
+## 🎯 使用场景
 
-发现 Bug 或有功能建议？请 [提交 Issue](../../issues)：
+### 开发者
+- **多环境管理** - 开发/测试/生产环境配置
+- **API测试验证** - 快速验证配置有效性
+- **团队协作** - 统一的配置管理方式
 
-- **Bug 报告**：复现步骤、预期行为、相关截图
-- **功能请求**：详细描述建议功能和使用场景
+### 个人用户
+- **多账号管理** - 管理不同的Claude账号
+- **配置备份** - 安全的配置存储
+- **快速切换** - 便捷的配置切换
 
-## 📄 开源协议
+## 🛡️ 安全特性
 
-本项目采用 MIT 协议 - 查看 [LICENSE](LICENSE) 文件了解详情。
+### 数据保护
+- **本地存储** - 所有配置存储在本地
+- **令牌脱敏** - 界面显示时隐藏敏感信息
+- **安全删除** - 删除操作需要确认
 
-## 🙏 致谢
+### 操作安全
+- **状态保护** - 添加模式下防止误操作
+- **输入验证** - 完整的表单字段验证
+- **错误处理** - 友好的错误提示
 
-- [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) - 提供现代化 GUI 框架
-- [Claude CLI](https://claude.ai) - 本工具支持的优秀 AI 助手
-- 所有帮助改进项目的贡献者
+## 📈 版本历史
 
-## 📊 项目统计
+### v1.0 (当前版本)
+- ✅ 完整的配置管理功能
+- ✅ API测试和批量测试
+- ✅ 智能状态显示
+- ✅ 优化的用户界面
+- ✅ 稳定的错误处理
 
-- **开发语言**：Python
-- **GUI 框架**：CustomTkinter
-- **构建工具**：PyInstaller
-- **目标平台**：Windows（跨平台代码）
+## 🤝 支持与反馈
+
+### 问题报告
+如遇到问题，请提供以下信息：
+- 操作系统版本
+- 具体操作步骤
+- 错误信息截图
+
+### 功能建议
+欢迎提出改进建议，我们会认真考虑每一个反馈。
+
+## 📄 许可证
+
+本项目采用 MIT 许可证，详见 LICENSE 文件。
+
+---
+
+**CC配置切换器 v1.0** - 让Claude CLI配置管理变得简单高效！ 🚀
