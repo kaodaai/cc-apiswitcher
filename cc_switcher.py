@@ -309,7 +309,7 @@ class ConfigManagementFrame(wx.Frame):
         edit_sizer = wx.StaticBoxSizer(edit_box, wx.VERTICAL)
 
         # 表单网格
-        form_sizer = wx.FlexGridSizer(4, 2, 5, 10)
+        form_sizer = wx.FlexGridSizer(5, 2, 5, 10)
         form_sizer.AddGrowableCol(1)
 
         # 名称
@@ -333,6 +333,11 @@ class ConfigManagementFrame(wx.Frame):
         self.model_choice = wx.Choice(panel, choices=models)
         self.model_choice.SetSelection(0)
         form_sizer.Add(self.model_choice, 1, wx.EXPAND)
+
+        # 备注
+        form_sizer.Add(wx.StaticText(panel, label="备注:"), 0, wx.ALIGN_CENTER_VERTICAL)
+        self.note_text = wx.TextCtrl(panel)
+        form_sizer.Add(self.note_text, 1, wx.EXPAND)
 
         edit_sizer.Add(form_sizer, 0, wx.ALL | wx.EXPAND, 10)
         main_sizer.Add(edit_sizer, 0, wx.ALL | wx.EXPAND, 10)
@@ -372,6 +377,7 @@ class ConfigManagementFrame(wx.Frame):
 
         # 事件绑定
         self.config_list.Bind(wx.EVT_LIST_ITEM_SELECTED, self.on_select)
+        self.config_list.Bind(wx.EVT_MOTION, self.on_list_motion)
         self.add_btn.Bind(wx.EVT_BUTTON, self.on_add)
         self.update_btn.Bind(wx.EVT_BUTTON, self.on_update)
         self.save_btn.Bind(wx.EVT_BUTTON, self.on_save)
@@ -404,6 +410,25 @@ class ConfigManagementFrame(wx.Frame):
         env_url = env_config.get('ANTHROPIC_BASE_URL', '未设置')
         env_text = f"系统环境变量: {env_url}"
         self.env_config_label.SetLabel(env_text)
+
+    def on_list_motion(self, event):
+        """处理列表鼠标移动事件，显示备注工具提示"""
+        pos = event.GetPosition()
+        item, flags = self.config_list.HitTest(pos)
+
+        if item != wx.NOT_FOUND:
+            configs = self.config_manager.get_all_configs()
+            if item < len(configs):
+                config = configs[item]
+                note = config.get("note", "")
+                if note:
+                    self.config_list.SetToolTip(f"{config['name']}: {note}")
+                else:
+                    self.config_list.SetToolTip(f"{config['name']}: 无备注")
+        else:
+            self.config_list.SetToolTip("")
+
+        event.Skip()
 
     def update_button_states(self):
         """更新按钮状态"""
@@ -472,12 +497,14 @@ class ConfigManagementFrame(wx.Frame):
         self.url_text.SetValue("https://api.anthropic.com")
         self.token_text.SetValue("")
         self.model_choice.SetSelection(0)
+        self.note_text.SetValue("")
 
     def load_form(self, config):
         """加载配置到表单"""
         self.name_text.SetValue(config["name"])
         self.url_text.SetValue(config.get("ANTHROPIC_BASE_URL", ""))
         self.token_text.SetValue(config.get("ANTHROPIC_AUTH_TOKEN", ""))
+        self.note_text.SetValue(config.get("note", ""))
 
         model = config.get("default_model", "")
         models = self.config_manager.get_available_models()
@@ -517,12 +544,13 @@ class ConfigManagementFrame(wx.Frame):
         url = self.url_text.GetValue().strip()
         token = self.token_text.GetValue().strip()
         model = self.model_choice.GetStringSelection()
+        note = self.note_text.GetValue().strip()
 
         if not all([name, url, token, model]):
-            wx.MessageBox("请填写所有字段", "提示", wx.OK | wx.ICON_INFORMATION)
+            wx.MessageBox("请填写所有必填字段", "提示", wx.OK | wx.ICON_INFORMATION)
             return
 
-        success, message = self.config_manager.add_config(name, url, token, model)
+        success, message = self.config_manager.add_config(name, url, token, model, note)
         if success:
             self.status_text.SetLabel(message)
             self.refresh_list()
@@ -553,13 +581,14 @@ class ConfigManagementFrame(wx.Frame):
         url = self.url_text.GetValue().strip()
         token = self.token_text.GetValue().strip()
         model = self.model_choice.GetStringSelection()
+        note = self.note_text.GetValue().strip()
 
         if not all([name, url, token, model]):
-            wx.MessageBox("请填写所有字段", "提示", wx.OK | wx.ICON_INFORMATION)
+            wx.MessageBox("请填写所有必填字段", "提示", wx.OK | wx.ICON_INFORMATION)
             return
 
         success, message = self.config_manager.update_config(
-            self.selected_index, name, url, token, model)
+            self.selected_index, name, url, token, model, note)
         if success:
             self.status_text.SetLabel(message)
             self.refresh_list()
