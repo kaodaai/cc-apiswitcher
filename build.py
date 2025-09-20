@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-CC配置切换器 v1.0 构建脚本
+CC-APISwitch v1.0 构建脚本
 """
 
 import os
@@ -10,13 +10,13 @@ from pathlib import Path
 
 def build_main():
     """构建主版本"""
-    print("开始构建 CC配置切换器 v1.0...")
+    print("开始构建 CC-APISwitch v1.0...")
 
     build_args = [
         "pyinstaller",
         "--onefile",
         "--windowed",
-        "--name=CCSwicher",
+        "--name=CC-APISwitch",
         "--distpath=dist",
         "--workpath=build",
         "--clean",
@@ -36,14 +36,6 @@ def build_main():
         "--exclude-module=pydoc",
         "--exclude-module=doctest",
         "--exclude-module=sqlite3",
-        "--exclude-module=multiprocessing",
-        "--exclude-module=asyncio",
-        "--exclude-module=concurrent",
-        "--exclude-module=email",
-        "--exclude-module=html",
-        "--exclude-module=http",
-        "--exclude-module=urllib",
-        "--exclude-module=xml",
         # 必要的隐藏导入
         "--hidden-import=wx._core",
         "--hidden-import=wx._adv",
@@ -54,14 +46,14 @@ def build_main():
         "cc_switcher.py"
     ]
 
-    print(f"构建命令: pyinstaller --onefile --windowed --name=CCSwicher ...")
+    print(f"构建命令: pyinstaller --onefile --windowed --name=CC-APISwitch ...")
     result = os.system(" ".join(build_args))
 
     if result == 0:
-        print("\n✅ CC配置切换器 v1.0 构建成功!")
+        print("\n✅ CC-APISwitch v1.0 构建成功!")
 
         # 检查文件大小
-        main_path = Path("dist/CCSwicher.exe")
+        main_path = Path("dist/CC-APISwitch.exe")
         if main_path.exists():
             size_mb = main_path.stat().st_size / (1024 * 1024)
             print(f"文件大小: {size_mb:.1f} MB")

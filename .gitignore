@@ -208,6 +208,5 @@ __marimo__/
 
 .claude/
 build_**
-dist_**
 test_**
 nul

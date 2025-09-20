@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Claude Code 配置切换器 v1.0
-基于wxPython的配置管理工具，支持API测试和批量操作
+CC-APISwitch v1.0
+专业的Claude API配置切换管理工具，支持项目快速启动
 """
 
 import wx
@@ -19,12 +19,12 @@ from datetime import datetime
 
 
 class SimpleConfigManager:
-    """简化配置管理器"""
+    """API配置管理器"""
 
     def __init__(self):
         self.claude_dir = Path.home() / ".claude"
         self.settings_file = self.claude_dir / "settings.json"
-        self.configs_file = self.claude_dir / "cc_switcher_configs.json"
+        self.configs_file = self.claude_dir / "cc_apiswitch_configs.json"
         self.configs_data = self.load_configs_data()
 
     def load_configs_data(self):
@@ -348,10 +348,10 @@ class SimpleConfigManager:
 
 
 class ConfigManagementFrame(wx.Frame):
-    """配置管理主窗口"""
+    """API配置管理主窗口"""
 
     def __init__(self):
-        super().__init__(None, title="CC配置切换器 v1.0", size=(900, 600))
+        super().__init__(None, title="CC-APISwitch v1.0", size=(900, 600))
         self.config_manager = SimpleConfigManager()
         self.selected_index = -1
         self.testing_indices = set()  # 正在测试的配置索引
@@ -390,7 +390,7 @@ class ConfigManagementFrame(wx.Frame):
         main_sizer.Add(self.config_list, 1, wx.ALL | wx.EXPAND, 10)
 
         # 配置编辑区域
-        edit_box = wx.StaticBox(panel, label="配置编辑")
+        edit_box = wx.StaticBox(panel, label="API配置编辑")
         edit_sizer = wx.StaticBoxSizer(edit_box, wx.VERTICAL)
 
         # 表单网格
