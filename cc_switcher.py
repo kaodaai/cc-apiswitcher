@@ -55,7 +55,7 @@ class SimpleConfigManager:
         """获取所有配置"""
         return self.configs_data["configs"]
 
-    def add_config(self, name, base_url, auth_token, model):
+    def add_config(self, name, base_url, auth_token, model, note=""):
         """添加新配置"""
         for config in self.configs_data["configs"]:
             if config["name"] == name:
@@ -66,6 +66,7 @@ class SimpleConfigManager:
             "ANTHROPIC_BASE_URL": base_url,
             "ANTHROPIC_AUTH_TOKEN": auth_token,
             "default_model": model,
+            "note": note,
             "test_status": "未测试",
             "test_time": "",
             "test_message": ""
@@ -75,7 +76,7 @@ class SimpleConfigManager:
         self.save_configs_data()
         return True, "配置添加成功"
 
-    def update_config(self, index, name, base_url, auth_token, model):
+    def update_config(self, index, name, base_url, auth_token, model, note=""):
         """更新配置"""
         if index < 0 or index >= len(self.configs_data["configs"]):
             return False, "无效的配置索引"
@@ -90,7 +91,8 @@ class SimpleConfigManager:
             "name": name,
             "ANTHROPIC_BASE_URL": base_url,
             "ANTHROPIC_AUTH_TOKEN": auth_token,
-            "default_model": model
+            "default_model": model,
+            "note": note
         })
 
         self.save_configs_data()
@@ -229,6 +231,26 @@ class SimpleConfigManager:
             self.save_configs_data()
             return False, f"测试失败: {str(e)}", {}
 
+    def get_current_claude_config(self):
+        """获取当前claude配置"""
+        try:
+            if self.settings_file.exists():
+                with open(self.settings_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass
+        return {}
+
+    def get_system_env_config(self):
+        """获取系统环境变量配置"""
+        env_config = {}
+        try:
+            env_config['ANTHROPIC_BASE_URL'] = os.environ.get('ANTHROPIC_BASE_URL', '')
+            env_config['ANTHROPIC_AUTH_TOKEN'] = os.environ.get('ANTHROPIC_AUTH_TOKEN', '')
+        except:
+            pass
+        return env_config
+
     def get_available_models(self):
         """获取可用模型列表"""
         return [
@@ -259,11 +281,19 @@ class ConfigManagementFrame(wx.Frame):
         panel = wx.Panel(self)
         main_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        # 标题
-        title_label = wx.StaticText(panel, label="配置管理")
-        title_font = wx.Font(16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
-        title_label.SetFont(title_font)
-        main_sizer.Add(title_label, 0, wx.ALL | wx.CENTER, 10)
+        # 当前配置显示
+        self.current_config_label = wx.StaticText(panel, label="")
+        config_font = wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        self.current_config_label.SetFont(config_font)
+        self.current_config_label.SetForegroundColour(wx.Colour(0, 100, 0))
+        main_sizer.Add(self.current_config_label, 0, wx.ALL | wx.EXPAND, 10)
+
+        # 系统环境变量配置显示
+        self.env_config_label = wx.StaticText(panel, label="")
+        env_font = wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+        self.env_config_label.SetFont(env_font)
+        self.env_config_label.SetForegroundColour(wx.Colour(100, 100, 100))
+        main_sizer.Add(self.env_config_label, 0, wx.ALL | wx.EXPAND, 10)
 
         # 配置列表 - 多列显示
         self.config_list = wx.ListCtrl(panel, style=wx.LC_REPORT | wx.LC_SINGLE_SEL)
@@ -354,6 +384,26 @@ class ConfigManagementFrame(wx.Frame):
 
         # 初始按钮状态
         self.update_button_states()
+        self.update_config_display()
+
+    def update_config_display(self):
+        """更新配置显示信息"""
+        # 获取当前claude配置
+        claude_config = self.config_manager.get_current_claude_config()
+        if claude_config:
+            base_url = claude_config.get('ANTHROPIC_BASE_URL', '未设置')
+            model = claude_config.get('default_model', '未设置')
+            claude_text = f"当前Claude配置: {base_url} | {model}"
+        else:
+            claude_text = "当前Claude配置: 未配置"
+
+        self.current_config_label.SetLabel(claude_text)
+
+        # 获取系统环境变量配置
+        env_config = self.config_manager.get_system_env_config()
+        env_url = env_config.get('ANTHROPIC_BASE_URL', '未设置')
+        env_text = f"系统环境变量: {env_url}"
+        self.env_config_label.SetLabel(env_text)
 
     def update_button_states(self):
         """更新按钮状态"""
@@ -628,6 +678,7 @@ class ConfigManagementFrame(wx.Frame):
         if success:
             self.status_text.SetLabel(message)
             self.refresh_list()
+            self.update_config_display()  # 更新配置显示
         else:
             wx.MessageBox(message, "错误", wx.OK | wx.ICON_ERROR)
 
@@ -640,6 +691,7 @@ class ConfigManagementFrame(wx.Frame):
         success, message = self.config_manager.set_environment_variables(self.selected_index)
         if success:
             self.status_text.SetLabel(message)
+            self.update_config_display()  # 更新配置显示
         else:
             wx.MessageBox(message, "错误", wx.OK | wx.ICON_ERROR)
 
