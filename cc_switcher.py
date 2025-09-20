@@ -13,7 +13,9 @@ import winreg
 import requests
 import threading
 import time
+import glob
 from pathlib import Path
+from datetime import datetime
 
 
 class SimpleConfigManager:
@@ -261,6 +263,89 @@ class SimpleConfigManager:
             "claude-3-opus-20240229"
         ]
 
+    def get_claude_code_projects(self):
+        """获取Claude Code最近的项目列表"""
+        projects = []
+
+        try:
+            claude_projects_dir = Path.home() / ".claude" / "projects"
+
+            if not claude_projects_dir.exists():
+                return projects
+
+            # 检查读取权限
+            if not os.access(claude_projects_dir, os.R_OK):
+                print("没有权限访问Claude项目目录")
+                return projects
+
+            # 遍历所有项目目录
+            for project_dir in claude_projects_dir.iterdir():
+                if not project_dir.is_dir() or project_dir.name.startswith('.'):
+                    continue
+
+                try:
+                    # 获取项目名称（解码目录名）
+                    project_name = project_dir.name.replace("D--", "D:\\").replace("-", "\\")
+
+                    # 查找最新的会话文件来获取最后访问时间
+                    jsonl_files = list(project_dir.glob("*.jsonl"))
+                    if not jsonl_files:
+                        continue
+
+                    latest_time = None
+                    project_path = None
+
+                    # 遍历jsonl文件找到最新的和项目路径
+                    for jsonl_file in jsonl_files:
+                        try:
+                            # 检查文件权限
+                            if not os.access(jsonl_file, os.R_OK):
+                                continue
+
+                            with open(jsonl_file, 'r', encoding='utf-8') as f:
+                                first_line = f.readline().strip()
+                                if first_line:
+                                    data = json.loads(first_line)
+                                    # 跳过summary行，找用户消息
+                                    if data.get('type') == 'summary':
+                                        second_line = f.readline().strip()
+                                        if second_line:
+                                            data = json.loads(second_line)
+
+                                    if 'cwd' in data and 'timestamp' in data:
+                                        file_time = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00'))
+                                        if latest_time is None or file_time > latest_time:
+                                            latest_time = file_time
+                                            project_path = data['cwd']
+                        except (json.JSONDecodeError, IOError, KeyError, PermissionError) as e:
+                            continue
+
+                    if project_path and latest_time:
+                        # 检查项目路径是否仍然存在且有访问权限
+                        try:
+                            project_path_obj = Path(project_path)
+                            if project_path_obj.exists() and os.access(project_path_obj, os.R_OK):
+                                projects.append({
+                                    'name': project_path_obj.name,
+                                    'path': project_path,
+                                    'last_access': latest_time
+                                })
+                        except (OSError, PermissionError):
+                            continue
+
+                except (OSError, PermissionError) as e:
+                    continue
+
+            # 按最后访问时间排序（最新的在前）
+            projects.sort(key=lambda x: x['last_access'], reverse=True)
+
+        except (PermissionError, OSError) as e:
+            print(f"访问Claude目录时权限不足: {e}")
+        except Exception as e:
+            print(f"获取项目列表时出错: {e}")
+
+        return projects
+
 
 class ConfigManagementFrame(wx.Frame):
     """配置管理主窗口"""
@@ -369,9 +454,41 @@ class ConfigManagementFrame(wx.Frame):
 
         main_sizer.Add(btn_sizer, 0, wx.ALL | wx.CENTER, 10)
 
+        # 项目管理区域
+        project_box = wx.StaticBox(panel, label="项目快速启动")
+        project_sizer = wx.StaticBoxSizer(project_box, wx.HORIZONTAL)
+
+        # 项目选择下拉框
+        project_sizer.Add(wx.StaticText(panel, label="最近项目:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+        self.project_choice = wx.Choice(panel, size=(400, -1))
+        project_sizer.Add(self.project_choice, 1, wx.EXPAND | wx.ALL, 5)
+
+        # 项目操作按钮
+        self.refresh_project_btn = wx.Button(panel, label="刷新")
+        self.open_claude_btn = wx.Button(panel, label="启动Claude")
+        self.open_claude_c_btn = wx.Button(panel, label="启动Claude -c")
+
+        project_sizer.Add(self.refresh_project_btn, 0, wx.ALL, 5)
+        project_sizer.Add(self.open_claude_btn, 0, wx.ALL, 5)
+        project_sizer.Add(self.open_claude_c_btn, 0, wx.ALL, 5)
+
+        main_sizer.Add(project_sizer, 0, wx.ALL | wx.EXPAND, 10)
+
         # 状态栏信息
         self.status_text = wx.StaticText(panel, label="就绪")
         main_sizer.Add(self.status_text, 0, wx.ALL | wx.EXPAND, 10)
+
+        # 底部版权信息区域
+        bottom_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        bottom_sizer.AddStretchSpacer()  # 左侧伸缩空间，使版权信息靠右
+
+        copyright_text = wx.StaticText(panel, label="by: kaodaai")
+        copyright_font = wx.Font(8, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+        copyright_text.SetFont(copyright_font)
+        copyright_text.SetForegroundColour(wx.Colour(128, 128, 128))  # 灰色
+
+        bottom_sizer.Add(copyright_text, 0, wx.ALL, 5)
+        main_sizer.Add(bottom_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         panel.SetSizer(main_sizer)
 
@@ -388,9 +505,15 @@ class ConfigManagementFrame(wx.Frame):
         self.switch_btn.Bind(wx.EVT_BUTTON, self.on_switch)
         self.env_btn.Bind(wx.EVT_BUTTON, self.on_env_switch)
 
+        # 项目管理事件绑定
+        self.refresh_project_btn.Bind(wx.EVT_BUTTON, self.on_refresh_projects)
+        self.open_claude_btn.Bind(wx.EVT_BUTTON, self.on_open_claude)
+        self.open_claude_c_btn.Bind(wx.EVT_BUTTON, self.on_open_claude_c)
+
         # 初始按钮状态
         self.update_button_states()
         self.update_config_display()
+        self.refresh_projects()  # 初始化项目列表
 
     def update_config_display(self):
         """更新配置显示信息"""
@@ -723,6 +846,75 @@ class ConfigManagementFrame(wx.Frame):
             self.update_config_display()  # 更新配置显示
         else:
             wx.MessageBox(message, "错误", wx.OK | wx.ICON_ERROR)
+
+    def refresh_projects(self):
+        """刷新项目列表"""
+        projects = self.config_manager.get_claude_code_projects()
+        self.project_choice.Clear()
+
+        # 存储项目数据
+        self.projects_data = projects
+
+        if projects:
+            for project in projects:
+                # 显示项目名称和路径
+                display_text = f"{project['name']} ({project['path']})"
+                self.project_choice.Append(display_text)
+            self.project_choice.SetSelection(0)
+            self.status_text.SetLabel(f"已加载 {len(projects)} 个最近项目")
+        else:
+            # 检查是否是权限问题
+            claude_dir = Path.home() / ".claude"
+            if not claude_dir.exists():
+                self.project_choice.Append("Claude目录不存在")
+                self.status_text.SetLabel("未找到Claude配置目录，请先使用Claude Code")
+            elif not os.access(claude_dir, os.R_OK):
+                self.project_choice.Append("无权限访问Claude目录")
+                self.status_text.SetLabel("权限不足：无法访问Claude配置目录")
+            else:
+                self.project_choice.Append("未找到Claude Code项目")
+                self.status_text.SetLabel("未找到Claude Code项目历史记录")
+
+    def on_refresh_projects(self, event):
+        """刷新项目按钮事件"""
+        self.refresh_projects()
+
+    def get_selected_project_path(self):
+        """获取选中项目的路径"""
+        selection = self.project_choice.GetSelection()
+        if selection >= 0 and hasattr(self, 'projects_data') and selection < len(self.projects_data):
+            return self.projects_data[selection]['path']
+        return None
+
+    def on_open_claude(self, event):
+        """启动Claude命令"""
+        project_path = self.get_selected_project_path()
+        if not project_path:
+            wx.MessageBox("请先选择一个项目", "提示", wx.OK | wx.ICON_INFORMATION)
+            return
+
+        try:
+            # 使用PowerShell在指定目录下启动claude
+            command = f'powershell -Command "cd \\"{project_path}\\"; claude"'
+            os.system(command)
+            self.status_text.SetLabel(f"已在 {project_path} 启动Claude")
+        except Exception as e:
+            wx.MessageBox(f"启动Claude失败: {str(e)}", "错误", wx.OK | wx.ICON_ERROR)
+
+    def on_open_claude_c(self, event):
+        """启动Claude -c命令"""
+        project_path = self.get_selected_project_path()
+        if not project_path:
+            wx.MessageBox("请先选择一个项目", "提示", wx.OK | wx.ICON_INFORMATION)
+            return
+
+        try:
+            # 使用PowerShell在指定目录下启动claude -c
+            command = f'powershell -Command "cd \\"{project_path}\\"; claude -c"'
+            os.system(command)
+            self.status_text.SetLabel(f"已在 {project_path} 启动Claude -c")
+        except Exception as e:
+            wx.MessageBox(f"启动Claude -c失败: {str(e)}", "错误", wx.OK | wx.ICON_ERROR)
 
 
 class SimpleApp(wx.App):
