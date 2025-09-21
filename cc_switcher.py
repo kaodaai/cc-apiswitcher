@@ -616,8 +616,8 @@ class ConfigManagementFrame(wx.Frame):
         for i, config in enumerate(configs):
             index = self.config_list.InsertItem(i, config["name"])
 
-            # 模型显示（简化）
-            model = config.get("default_model", "").replace("claude-", "")
+            # 模型显示
+            model = config.get("default_model", "")
             self.config_list.SetItem(index, 1, model)
 
             # 测试状态
