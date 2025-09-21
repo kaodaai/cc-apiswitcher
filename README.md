@@ -1,4 +1,4 @@
-# CC-APISwitch v1.0
+# CC-APISwitch v1.1
 
 🎯 **专业的Claude API配置切换管理工具，支持项目快速启动**
 
@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/badge/Platform-Windows-lightgrey.svg" alt="Platform">
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
   <img src="https://img.shields.io/badge/GUI-wxPython-orange.svg" alt="GUI">
-  <img src="https://img.shields.io/badge/Version-1.0-green.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Version-1.1-green.svg" alt="Version">
 </p>
 
 <p align="center">
@@ -21,7 +21,8 @@
 - **智能编辑** - 选中配置即可就地编辑，支持备注字段
 - **安全删除** - 带确认提示的安全删除机制
 - **一键切换** - 快速切换Claude CLI活跃API配置
-- **环境变量** - 直接设置系统环境变量
+- **环境变量管理** - 支持用户环境变量和系统环境变量设置
+- **配置一致性检查** - 启动时自动检查并修复配置不一致问题
 
 ### 🧪 API测试验证
 - **单配置测试** - 验证指定API配置的连通性
@@ -32,7 +33,8 @@
 ### 🚀 项目快速启动
 - **智能发现** - 自动扫描Claude Code项目历史
 - **最近优先** - 按最后访问时间排序显示项目
-- **一键启动** - 支持 `claude` 和 `claude -c` 两种启动模式
+- **非阻塞启动** - 支持 `claude` 和 `claude -c` 两种启动模式，启动后不阻塞主程序
+- **独立进程** - 项目在新窗口中独立运行，关闭CC Switcher不影响已启动的项目
 - **路径跳转** - 自动切换到项目目录执行命令
 
 ### 🎨 用户界面
@@ -64,7 +66,7 @@
 │ │ 备    注: [生产环境API配置          ]           │ │
 │ └──────────────────────────────────────────────────┘ │
 │                                                      │
-│ [添加][更新][删除]  [测试][批量测试]  [切换][环境变量] │
+│ [添加][更新][删除]  [测试][批量测试]  [切换][用户环境变量][系统环境变量] │
 │                                                      │
 │ ┌──── 项目快速启动 ─────────────────────────────────┐ │
 │ │最近项目:[cc-apiswitch (D:\Code\cc-apiswitch)▼]  │ │
@@ -107,12 +109,14 @@
 
 3. **切换配置**
    - 选择配置后点击「切换配置」设为Claude CLI活跃配置
-   - 点击「环境变量」直接设置系统环境变量
+   - 点击「用户环境变量」设置当前用户的环境变量
+   - 点击「系统环境变量」设置系统级环境变量（需要管理员权限）
 
 4. **项目启动**
    - 程序自动扫描Claude Code项目历史
    - 从下拉列表选择项目
    - 点击「启动Claude」或「启动Claude -c」快速启动
+   - 启动后项目在独立窗口中运行，不阻塞CC Switcher主程序
 
 ## 📋 系统要求
 
@@ -122,9 +126,12 @@
 - **依赖包**: wxpython, requests (源码运行)
 
 ### 可执行文件
-- **文件大小**: ~21MB
+- **文件大小**: ~20.5MB
 - **运行依赖**: 无需Python环境
 - **启动方式**: 双击即可运行
+- **权限要求**:
+  - 普通权限：用户环境变量设置
+  - 管理员权限：系统环境变量设置
 
 ## 🔧 开发构建
 
@@ -160,7 +167,8 @@ SimpleConfigManager         # API配置管理核心
 ├── API配置CRUD操作         # 增删改查
 ├── API测试功能             # 单个和批量测试
 ├── 状态持久化              # 测试结果保存
-├── 环境变量管理            # 系统集成
+├── 环境变量管理            # 用户/系统环境变量设置
+├── 配置一致性检查          # 自动检测和修复配置不一致
 └── Claude项目发现          # 项目历史扫描
 
 ConfigManagementFrame       # 主界面
@@ -191,6 +199,13 @@ ConfigManagementFrame       # 主界面
 }
 ```
 
+### 支持的模型
+- **Claude 4系列**: claude-4-sonnet, claude-sonnet-4-20250514
+- **Claude 3.7系列**: claude-3-7-sonnet, claude-3-7-sonnet-20250219
+- **Claude 3.5系列**: claude-3-5-sonnet, claude-3-5-sonnet-20241022, claude-3-5-haiku, claude-3-5-haiku-20241022
+- **Claude 3系列**: claude-3-opus, claude-3-opus-20240229
+- **简化名称**: claude-sonnet, claude-haiku, claude-opus
+
 ## 🎯 使用场景
 
 ### 开发者
@@ -220,14 +235,25 @@ ConfigManagementFrame       # 主界面
 
 ## 📈 更新日志
 
-### v1.0 (当前版本)
+### v1.1 (当前版本)
 - ✅ 完整的API配置管理功能
 - ✅ API测试和批量测试
 - ✅ Claude Code项目自动发现
-- ✅ 项目快速启动功能
+- ✅ 项目快速启动功能（非阻塞式）
 - ✅ 智能状态显示和错误处理
 - ✅ 优化的用户界面设计
 - ✅ 完善的权限处理机制
+- ✅ 用户环境变量和系统环境变量支持
+- ✅ 配置一致性检查和自动修复
+- ✅ 更新模型支持（Claude 4系列、3.7系列、3.5系列、3系列）
+- ✅ 移除过时模型和不相关模型
+- ✅ 优化UI布局，统一配置显示样式
+
+### v1.0
+- ✅ 基础API配置管理功能
+- ✅ API测试和批量测试
+- ✅ Claude Code项目自动发现
+- ✅ 项目快速启动功能
 
 ## 🤝 贡献指南
 
@@ -255,6 +281,6 @@ ConfigManagementFrame       # 主界面
 
 ---
 
-**CC-APISwitch v1.0** - 让Claude API配置管理变得简单高效！ 🚀
+**CC-APISwitch v1.1** - 让Claude API配置管理变得简单高效！ 🚀
 
 **作者: kaodaai**

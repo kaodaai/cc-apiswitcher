@@ -1,6 +1,6 @@
 [project]
 name = "cc-apiswitch"
-version = "1.0.0"
+version = "1.1.0"
 description = "专业的Claude API配置切换管理工具，支持项目快速启动"
 readme = "README.md"
 requires-python = ">=3.11"

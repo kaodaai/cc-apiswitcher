@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-CC-APISwitch v1.0
+CC-APISwitch v1.1
 专业的Claude API配置切换管理工具，支持项目快速启动
 """
 
@@ -294,27 +294,28 @@ class SimpleConfigManager:
     def get_available_models(self):
         """获取可用模型列表"""
         return [
-            # 带版本日期的Claude模型
+            # Claude 4系列模型
+            "claude-4-sonnet",
             "claude-sonnet-4-20250514",
+
+            # Claude 3.7系列模型
+            "claude-3-7-sonnet",
+            "claude-3-7-sonnet-20250219",
+
+            # Claude 3.5系列模型
+            "claude-3-5-sonnet",
             "claude-3-5-sonnet-20241022",
+            "claude-3-5-haiku",
             "claude-3-5-haiku-20241022",
-            "claude-3-haiku-20240307",
+
+            # Claude 3系列模型
+            "claude-3-opus",
             "claude-3-opus-20240229",
 
-            # 不带版本日期的Claude模型
+            # 简化名称模型
             "claude-sonnet",
             "claude-haiku",
-            "claude-opus",
-
-            # Claude thinking模型
-            "claude-sonnet-think",
-            "claude-haiku-think",
-            "claude-opus-think",
-
-            # 智谱AI模型
-            "glm-4.5",
-            "glm-4",
-            "glm-3-turbo"
+            "claude-opus"
         ]
 
     def get_claude_code_projects(self):
@@ -405,7 +406,7 @@ class ConfigManagementFrame(wx.Frame):
     """API配置管理主窗口"""
 
     def __init__(self):
-        super().__init__(None, title="CC-APISwitch v1.0", size=(900, 700))  # 调整窗口高度
+        super().__init__(None, title="CC-APISwitch v1.1", size=(900, 700))  # 调整窗口高度
         self.config_manager = SimpleConfigManager()
         self.selected_index = -1
         self.testing_indices = set()  # 正在测试的配置索引
@@ -421,17 +422,17 @@ class ConfigManagementFrame(wx.Frame):
 
         # 当前配置显示
         self.current_config_label = wx.StaticText(panel, label="")
-        config_font = wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        config_font = wx.Font(11, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
         self.current_config_label.SetFont(config_font)
-        self.current_config_label.SetForegroundColour(wx.Colour(0, 100, 0))
-        main_sizer.Add(self.current_config_label, 0, wx.ALL | wx.EXPAND, 10)
+        self.current_config_label.SetForegroundColour(wx.Colour(0, 100, 200))
+        main_sizer.Add(self.current_config_label, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 10)
 
         # 系统环境变量配置显示
         self.env_config_label = wx.StaticText(panel, label="")
-        env_font = wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+        env_font = wx.Font(11, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
         self.env_config_label.SetFont(env_font)
-        self.env_config_label.SetForegroundColour(wx.Colour(100, 100, 100))
-        main_sizer.Add(self.env_config_label, 0, wx.ALL | wx.EXPAND, 10)
+        self.env_config_label.SetForegroundColour(wx.Colour(0, 100, 200))
+        main_sizer.Add(self.env_config_label, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 10)
 
         # 配置列表 - 多列显示
         self.config_list = wx.ListCtrl(panel, style=wx.LC_REPORT | wx.LC_SINGLE_SEL)
@@ -527,21 +528,22 @@ class ConfigManagementFrame(wx.Frame):
 
         main_sizer.Add(project_sizer, 0, wx.ALL | wx.EXPAND, 10)
 
-        # 状态栏信息
-        self.status_text = wx.StaticText(panel, label="就绪")
-        main_sizer.Add(self.status_text, 0, wx.ALL | wx.EXPAND, 10)
-
-        # 底部版权信息区域
+        # 底部状态栏和版权信息区域（同一行）
         bottom_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        bottom_sizer.AddStretchSpacer()  # 左侧伸缩空间，使版权信息靠右
 
+        # 左侧状态信息
+        self.status_text = wx.StaticText(panel, label="就绪")
+        bottom_sizer.Add(self.status_text, 1, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 10)
+
+        # 右侧版权信息
+        bottom_sizer.AddStretchSpacer()
         copyright_text = wx.StaticText(panel, label="by: kaodaai")
         copyright_font = wx.Font(8, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
         copyright_text.SetFont(copyright_font)
         copyright_text.SetForegroundColour(wx.Colour(128, 128, 128))  # 灰色
+        bottom_sizer.Add(copyright_text, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
 
-        bottom_sizer.Add(copyright_text, 0, wx.ALL, 5)
-        main_sizer.Add(bottom_sizer, 0, wx.EXPAND | wx.ALL, 5)
+        main_sizer.Add(bottom_sizer, 0, wx.EXPAND | wx.BOTTOM, 5)
 
         panel.SetSizer(main_sizer)
 
@@ -923,13 +925,23 @@ class ConfigManagementFrame(wx.Frame):
             wx.MessageBox("请先选择一个项目", "提示", wx.OK | wx.ICON_INFORMATION)
             return
 
-        try:
-            # 使用PowerShell在指定目录下启动claude
-            command = f'powershell -Command "cd \\"{project_path}\\"; claude"'
-            os.system(command)
-            self.status_text.SetLabel(f"已在 {project_path} 启动Claude")
-        except Exception as e:
-            wx.MessageBox(f"启动Claude失败: {str(e)}", "错误", wx.OK | wx.ICON_ERROR)
+        # 使用独立线程启动，不阻塞主程序
+        def launch_claude():
+            try:
+                import subprocess
+                # 使用PowerShell在新窗口中启动claude
+                powershell_command = f'Set-Location "{project_path}"; claude'
+                command = f'powershell -Command "Start-Process powershell -ArgumentList \'-NoExit\', \'-Command\', \'{powershell_command}\'" -WindowStyle Normal'
+                subprocess.Popen(command, shell=True)
+
+                # 在主线程中更新状态
+                wx.CallAfter(self.status_text.SetLabel, f"已在 {project_path} 启动Claude (新窗口)")
+                print(f"Claude launched in new window at {project_path}")
+            except Exception as e:
+                wx.CallAfter(lambda: wx.MessageBox(f"启动Claude失败: {str(e)}", "错误", wx.OK | wx.ICON_ERROR))
+
+        # 启动线程
+        threading.Thread(target=launch_claude, daemon=True).start()
 
     def on_open_claude_c(self, event):
         """启动Claude -c命令"""
@@ -938,13 +950,23 @@ class ConfigManagementFrame(wx.Frame):
             wx.MessageBox("请先选择一个项目", "提示", wx.OK | wx.ICON_INFORMATION)
             return
 
-        try:
-            # 使用PowerShell在指定目录下启动claude -c
-            command = f'powershell -Command "cd \\"{project_path}\\"; claude -c"'
-            os.system(command)
-            self.status_text.SetLabel(f"已在 {project_path} 启动Claude -c")
-        except Exception as e:
-            wx.MessageBox(f"启动Claude -c失败: {str(e)}", "错误", wx.OK | wx.ICON_ERROR)
+        # 使用独立线程启动，不阻塞主程序
+        def launch_claude_c():
+            try:
+                import subprocess
+                # 使用PowerShell在新窗口中启动claude -c
+                powershell_command = f'Set-Location "{project_path}"; claude -c'
+                command = f'powershell -Command "Start-Process powershell -ArgumentList \'-NoExit\', \'-Command\', \'{powershell_command}\'" -WindowStyle Normal'
+                subprocess.Popen(command, shell=True)
+
+                # 在主线程中更新状态
+                wx.CallAfter(self.status_text.SetLabel, f"已在 {project_path} 启动Claude -c (新窗口)")
+                print(f"Claude -c launched in new window at {project_path}")
+            except Exception as e:
+                wx.CallAfter(lambda: wx.MessageBox(f"启动Claude -c失败: {str(e)}", "错误", wx.OK | wx.ICON_ERROR))
+
+        # 启动线程
+        threading.Thread(target=launch_claude_c, daemon=True).start()
 
 
 class SimpleApp(wx.App):
