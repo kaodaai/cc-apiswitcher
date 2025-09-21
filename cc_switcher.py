@@ -470,7 +470,9 @@ class ConfigManagementFrame(wx.Frame):
         form_sizer.Add(wx.StaticText(panel, label="默认模型:"), 0, wx.ALIGN_CENTER_VERTICAL)
         models = self.config_manager.get_available_models()
         self.model_choice = wx.Choice(panel, choices=models)
-        self.model_choice.SetSelection(0)
+        # 设置默认选择为 claude-sonnet-4-20250514
+        default_model_index = models.index("claude-sonnet-4-20250514") if "claude-sonnet-4-20250514" in models else 0
+        self.model_choice.SetSelection(default_model_index)
         form_sizer.Add(self.model_choice, 1, wx.EXPAND)
 
         # 备注
@@ -929,9 +931,24 @@ class ConfigManagementFrame(wx.Frame):
         def launch_claude():
             try:
                 import subprocess
-                # 使用PowerShell在新窗口中启动claude
-                powershell_command = f'Set-Location "{project_path}"; claude'
-                command = f'powershell -Command "Start-Process powershell -ArgumentList \'-NoExit\', \'-Command\', \'{powershell_command}\'" -WindowStyle Normal'
+                # 获取当前选中的配置和模型
+                if self.selected_index >= 0:
+                    configs = self.config_manager.get_all_configs()
+                    if self.selected_index < len(configs):
+                        config = configs[self.selected_index]
+                        model = config.get("default_model", "claude-sonnet-4-20250514")
+                        # 使用PowerShell在新窗口中启动claude并切换模型
+                        powershell_command = f'Set-Location "{project_path}"; claude; /model {model}'
+                        command = f'powershell -Command "Start-Process powershell -ArgumentList \'-NoExit\', \'-Command\', \'{powershell_command}\'" -WindowStyle Normal'
+                    else:
+                        # 如果没有选中配置，使用默认模型
+                        powershell_command = f'Set-Location "{project_path}"; claude; /model claude-sonnet-4-20250514'
+                        command = f'powershell -Command "Start-Process powershell -ArgumentList \'-NoExit\', \'-Command\', \'{powershell_command}\'" -WindowStyle Normal'
+                else:
+                    # 如果没有选中配置，使用默认模型
+                    powershell_command = f'Set-Location "{project_path}"; claude; /model claude-sonnet-4-20250514'
+                    command = f'powershell -Command "Start-Process powershell -ArgumentList \'-NoExit\', \'-Command\', \'{powershell_command}\'" -WindowStyle Normal'
+
                 subprocess.Popen(command, shell=True)
 
                 # 在主线程中更新状态
@@ -954,9 +971,24 @@ class ConfigManagementFrame(wx.Frame):
         def launch_claude_c():
             try:
                 import subprocess
-                # 使用PowerShell在新窗口中启动claude -c
-                powershell_command = f'Set-Location "{project_path}"; claude -c'
-                command = f'powershell -Command "Start-Process powershell -ArgumentList \'-NoExit\', \'-Command\', \'{powershell_command}\'" -WindowStyle Normal'
+                # 获取当前选中的配置和模型
+                if self.selected_index >= 0:
+                    configs = self.config_manager.get_all_configs()
+                    if self.selected_index < len(configs):
+                        config = configs[self.selected_index]
+                        model = config.get("default_model", "claude-sonnet-4-20250514")
+                        # 使用PowerShell在新窗口中启动claude -c并切换模型
+                        powershell_command = f'Set-Location "{project_path}"; claude -c; /model {model}'
+                        command = f'powershell -Command "Start-Process powershell -ArgumentList \'-NoExit\', \'-Command\', \'{powershell_command}\'" -WindowStyle Normal'
+                    else:
+                        # 如果没有选中配置，使用默认模型
+                        powershell_command = f'Set-Location "{project_path}"; claude -c; /model claude-sonnet-4-20250514'
+                        command = f'powershell -Command "Start-Process powershell -ArgumentList \'-NoExit\', \'-Command\', \'{powershell_command}\'" -WindowStyle Normal'
+                else:
+                    # 如果没有选中配置，使用默认模型
+                    powershell_command = f'Set-Location "{project_path}"; claude -c; /model claude-sonnet-4-20250514'
+                    command = f'powershell -Command "Start-Process powershell -ArgumentList \'-NoExit\', \'-Command\', \'{powershell_command}\'" -WindowStyle Normal'
+
                 subprocess.Popen(command, shell=True)
 
                 # 在主线程中更新状态
