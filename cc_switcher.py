@@ -154,7 +154,7 @@ class SimpleConfigManager:
         except Exception as e:
             return False, f"切换失败: {str(e)}"
 
-    def set_environment_variables(self, index):
+    def set_environment_variables(self, index, scope="user"):
         """设置环境变量"""
         if index < 0 or index >= len(self.configs_data["configs"]):
             return False, "无效的配置索引"
@@ -165,14 +165,37 @@ class SimpleConfigManager:
             base_url = config["ANTHROPIC_BASE_URL"]
             auth_token = config["ANTHROPIC_AUTH_TOKEN"]
 
+            # 设置当前进程环境变量
             os.environ["ANTHROPIC_BASE_URL"] = base_url
             os.environ["ANTHROPIC_AUTH_TOKEN"] = auth_token
 
-            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_ALL_ACCESS)
+            # 根据scope选择注册表位置
+            if scope == "system":
+                # 系统环境变量需要管理员权限
+                try:
+                    key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment", 0, winreg.KEY_ALL_ACCESS)
+                    scope_name = "系统"
+                except PermissionError:
+                    return False, "设置系统环境变量需要管理员权限，请以管理员身份运行程序"
+            else:
+                # 用户环境变量
+                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_ALL_ACCESS)
+                scope_name = "用户"
+
+            # 设置注册表环境变量
             winreg.SetValueEx(key, "ANTHROPIC_BASE_URL", 0, winreg.REG_SZ, base_url)
             winreg.SetValueEx(key, "ANTHROPIC_AUTH_TOKEN", 0, winreg.REG_SZ, auth_token)
             winreg.CloseKey(key)
-            return True, f"环境变量已设置为: {config['name']}"
+
+            # 通知系统环境变量已更改
+            import ctypes
+            HWND_BROADCAST = 0xFFFF
+            WM_SETTINGCHANGE = 0x1A
+            SMTO_ABORTIFHUNG = 0x0002
+            result = ctypes.c_long()
+            ctypes.windll.user32.SendMessageTimeoutW(HWND_BROADCAST, WM_SETTINGCHANGE, 0, "Environment", SMTO_ABORTIFHUNG, 5000, ctypes.byref(result))
+
+            return True, f"{scope_name}环境变量已设置为: {config['name']}"
         except Exception as e:
             return False, f"设置失败: {str(e)}"
 
@@ -466,7 +489,8 @@ class ConfigManagementFrame(wx.Frame):
         self.test_btn = wx.Button(panel, label="测试")
         self.batch_test_btn = wx.Button(panel, label="批量测试")
         self.switch_btn = wx.Button(panel, label="切换配置")
-        self.env_btn = wx.Button(panel, label="环境变量")
+        self.env_btn = wx.Button(panel, label="用户环境变量")
+        self.system_env_btn = wx.Button(panel, label="系统环境变量")
         self.clear_btn = wx.Button(panel, label="清除")
 
         btn_sizer.Add(self.add_btn, 0, wx.ALL, 2)
@@ -479,6 +503,7 @@ class ConfigManagementFrame(wx.Frame):
         btn_sizer.AddSpacer(10)
         btn_sizer.Add(self.switch_btn, 0, wx.ALL, 2)
         btn_sizer.Add(self.env_btn, 0, wx.ALL, 2)
+        btn_sizer.Add(self.system_env_btn, 0, wx.ALL, 2)
 
         main_sizer.Add(btn_sizer, 0, wx.ALL | wx.CENTER, 5)
 
@@ -531,6 +556,7 @@ class ConfigManagementFrame(wx.Frame):
         self.batch_test_btn.Bind(wx.EVT_BUTTON, self.on_batch_test)
         self.switch_btn.Bind(wx.EVT_BUTTON, self.on_switch)
         self.env_btn.Bind(wx.EVT_BUTTON, self.on_env_switch)
+        self.system_env_btn.Bind(wx.EVT_BUTTON, self.on_system_env_switch)
 
         # 项目管理事件绑定
         self.refresh_project_btn.Bind(wx.EVT_BUTTON, self.on_refresh_projects)
@@ -813,12 +839,25 @@ class ConfigManagementFrame(wx.Frame):
             wx.MessageBox(message, "错误", wx.OK | wx.ICON_ERROR)
 
     def on_env_switch(self, event):
-        """环境变量切换"""
+        """用户环境变量切换"""
         if self.selected_index < 0:
             wx.MessageBox("请先选择一个配置", "提示", wx.OK | wx.ICON_INFORMATION)
             return
 
-        success, message = self.config_manager.set_environment_variables(self.selected_index)
+        success, message = self.config_manager.set_environment_variables(self.selected_index, "user")
+        if success:
+            self.status_text.SetLabel(message)
+            self.update_config_display()  # 更新配置显示
+        else:
+            wx.MessageBox(message, "错误", wx.OK | wx.ICON_ERROR)
+
+    def on_system_env_switch(self, event):
+        """系统环境变量切换"""
+        if self.selected_index < 0:
+            wx.MessageBox("请先选择一个配置", "提示", wx.OK | wx.ICON_INFORMATION)
+            return
+
+        success, message = self.config_manager.set_environment_variables(self.selected_index, "system")
         if success:
             self.status_text.SetLabel(message)
             self.update_config_display()  # 更新配置显示
