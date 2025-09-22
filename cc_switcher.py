@@ -164,10 +164,12 @@ class SimpleConfigManager:
         try:
             base_url = config["ANTHROPIC_BASE_URL"]
             auth_token = config["ANTHROPIC_AUTH_TOKEN"]
+            model = config.get("default_model", "claude-sonnet-4-20250514")
 
             # 设置当前进程环境变量
             os.environ["ANTHROPIC_BASE_URL"] = base_url
             os.environ["ANTHROPIC_AUTH_TOKEN"] = auth_token
+            os.environ["ANTHROPIC_MODEL"] = model
 
             # 根据scope选择注册表位置
             if scope == "system":
@@ -185,6 +187,7 @@ class SimpleConfigManager:
             # 设置注册表环境变量
             winreg.SetValueEx(key, "ANTHROPIC_BASE_URL", 0, winreg.REG_SZ, base_url)
             winreg.SetValueEx(key, "ANTHROPIC_AUTH_TOKEN", 0, winreg.REG_SZ, auth_token)
+            winreg.SetValueEx(key, "ANTHROPIC_MODEL", 0, winreg.REG_SZ, model)
             winreg.CloseKey(key)
 
             # 通知系统环境变量已更改
@@ -287,6 +290,7 @@ class SimpleConfigManager:
         try:
             env_config['ANTHROPIC_BASE_URL'] = os.environ.get('ANTHROPIC_BASE_URL', '')
             env_config['ANTHROPIC_AUTH_TOKEN'] = os.environ.get('ANTHROPIC_AUTH_TOKEN', '')
+            env_config['ANTHROPIC_MODEL'] = os.environ.get('ANTHROPIC_MODEL', '')
         except:
             pass
         return env_config
@@ -586,7 +590,8 @@ class ConfigManagementFrame(wx.Frame):
         # 获取系统环境变量配置
         env_config = self.config_manager.get_system_env_config()
         env_url = env_config.get('ANTHROPIC_BASE_URL', '未设置')
-        env_text = f"系统环境变量: {env_url}"
+        env_model = env_config.get('ANTHROPIC_MODEL', '未设置')
+        env_text = f"系统环境变量: {env_url} | {env_model}"
         self.env_config_label.SetLabel(env_text)
 
     def on_list_motion(self, event):
@@ -920,8 +925,12 @@ class ConfigManagementFrame(wx.Frame):
             return self.projects_data[selection]['path']
         return None
 
-    def on_open_claude(self, event):
-        """启动Claude命令"""
+    def launch_claude_with_mode(self, use_c_flag=False):
+        """通用的Claude启动函数
+
+        Args:
+            use_c_flag (bool): 是否使用 -c 参数启动Claude
+        """
         project_path = self.get_selected_project_path()
         if not project_path:
             wx.MessageBox("请先选择一个项目", "提示", wx.OK | wx.ICON_INFORMATION)
@@ -931,74 +940,58 @@ class ConfigManagementFrame(wx.Frame):
         def launch_claude():
             try:
                 import subprocess
+                import tempfile
+                import os
+
                 # 获取当前选中的配置和模型
                 if self.selected_index >= 0:
                     configs = self.config_manager.get_all_configs()
                     if self.selected_index < len(configs):
                         config = configs[self.selected_index]
                         model = config.get("default_model", "claude-sonnet-4-20250514")
-                        # 使用PowerShell在新窗口中启动claude并切换模型
-                        powershell_command = f'Set-Location "{project_path}"; claude; /model {model}'
-                        command = f'powershell -Command "Start-Process powershell -ArgumentList \'-NoExit\', \'-Command\', \'{powershell_command}\'" -WindowStyle Normal'
                     else:
-                        # 如果没有选中配置，使用默认模型
-                        powershell_command = f'Set-Location "{project_path}"; claude; /model claude-sonnet-4-20250514'
-                        command = f'powershell -Command "Start-Process powershell -ArgumentList \'-NoExit\', \'-Command\', \'{powershell_command}\'" -WindowStyle Normal'
+                        model = "claude-sonnet-4-20250514"
                 else:
-                    # 如果没有选中配置，使用默认模型
-                    powershell_command = f'Set-Location "{project_path}"; claude; /model claude-sonnet-4-20250514'
-                    command = f'powershell -Command "Start-Process powershell -ArgumentList \'-NoExit\', \'-Command\', \'{powershell_command}\'" -WindowStyle Normal'
+                    model = "claude-sonnet-4-20250514"
 
+                # 根据参数决定启动方式
+                claude_command = "claude -c" if use_c_flag else "claude"
+                window_title = "Claude-c" if use_c_flag else "Claude"
+                mode_text = "Claude -c" if use_c_flag else "Claude"
+
+                # 创建临时批处理文件
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.bat', delete=False, encoding='gbk') as bat_file:
+                    bat_content = f'''@echo off
+cd /d "{project_path}"
+echo 启动{mode_text}，将使用环境变量中的模型: {model}
+start "{window_title}" powershell -NoExit -Command "{claude_command}"
+'''
+                    bat_file.write(bat_content)
+                    bat_path = bat_file.name
+
+                # 执行批处理文件
+                command = f'cmd /c "{bat_path}"'
                 subprocess.Popen(command, shell=True)
 
                 # 在主线程中更新状态
-                wx.CallAfter(self.status_text.SetLabel, f"已在 {project_path} 启动Claude (新窗口)")
-                print(f"Claude launched in new window at {project_path}")
+                status_message = f"已在 {project_path} 启动{mode_text} (新窗口)"
+                wx.CallAfter(self.status_text.SetLabel, status_message)
+                print(f"{mode_text} launched in new window at {project_path}")
+
             except Exception as e:
-                wx.CallAfter(lambda: wx.MessageBox(f"启动Claude失败: {str(e)}", "错误", wx.OK | wx.ICON_ERROR))
+                error_message = f"启动{mode_text}失败: {str(e)}"
+                wx.CallAfter(lambda: wx.MessageBox(error_message, "错误", wx.OK | wx.ICON_ERROR))
 
         # 启动线程
         threading.Thread(target=launch_claude, daemon=True).start()
 
+    def on_open_claude(self, event):
+        """启动Claude命令"""
+        self.launch_claude_with_mode(use_c_flag=False)
+
     def on_open_claude_c(self, event):
         """启动Claude -c命令"""
-        project_path = self.get_selected_project_path()
-        if not project_path:
-            wx.MessageBox("请先选择一个项目", "提示", wx.OK | wx.ICON_INFORMATION)
-            return
-
-        # 使用独立线程启动，不阻塞主程序
-        def launch_claude_c():
-            try:
-                import subprocess
-                # 获取当前选中的配置和模型
-                if self.selected_index >= 0:
-                    configs = self.config_manager.get_all_configs()
-                    if self.selected_index < len(configs):
-                        config = configs[self.selected_index]
-                        model = config.get("default_model", "claude-sonnet-4-20250514")
-                        # 使用PowerShell在新窗口中启动claude -c并切换模型
-                        powershell_command = f'Set-Location "{project_path}"; claude -c; /model {model}'
-                        command = f'powershell -Command "Start-Process powershell -ArgumentList \'-NoExit\', \'-Command\', \'{powershell_command}\'" -WindowStyle Normal'
-                    else:
-                        # 如果没有选中配置，使用默认模型
-                        powershell_command = f'Set-Location "{project_path}"; claude -c; /model claude-sonnet-4-20250514'
-                        command = f'powershell -Command "Start-Process powershell -ArgumentList \'-NoExit\', \'-Command\', \'{powershell_command}\'" -WindowStyle Normal'
-                else:
-                    # 如果没有选中配置，使用默认模型
-                    powershell_command = f'Set-Location "{project_path}"; claude -c; /model claude-sonnet-4-20250514'
-                    command = f'powershell -Command "Start-Process powershell -ArgumentList \'-NoExit\', \'-Command\', \'{powershell_command}\'" -WindowStyle Normal'
-
-                subprocess.Popen(command, shell=True)
-
-                # 在主线程中更新状态
-                wx.CallAfter(self.status_text.SetLabel, f"已在 {project_path} 启动Claude -c (新窗口)")
-                print(f"Claude -c launched in new window at {project_path}")
-            except Exception as e:
-                wx.CallAfter(lambda: wx.MessageBox(f"启动Claude -c失败: {str(e)}", "错误", wx.OK | wx.ICON_ERROR))
-
-        # 启动线程
-        threading.Thread(target=launch_claude_c, daemon=True).start()
+        self.launch_claude_with_mode(use_c_flag=True)
 
 
 class SimpleApp(wx.App):
