@@ -210,3 +210,5 @@ __marimo__/
 build_**
 test_**
 nul
+switch_git_protocol.py
+switch_git_protocol.ps1

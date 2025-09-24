@@ -428,7 +428,7 @@ class ConfigManagementFrame(wx.Frame):
     """API配置管理主窗口"""
 
     def __init__(self):
-        super().__init__(None, title="CC-APISwitch v1.2", size=(1050, 700))  # 增加窗口宽度
+        super().__init__(None, title="CC-APISwitch v1.2", size=(1050, 900))  # 增加窗口宽度
         self.config_manager = SimpleConfigManager()
         self.selected_index = -1
         self.testing_indices = set()  # 正在测试的配置索引
@@ -456,22 +456,14 @@ class ConfigManagementFrame(wx.Frame):
         self.env_config_label.SetForegroundColour(wx.Colour(0, 100, 200))
         main_sizer.Add(self.env_config_label, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 10)
 
-        # 配置列表区域 - 使用scrolled window支持自适应高度
-        list_scrolled_window = wx.ScrolledWindow(panel)
-        list_scrolled_window.SetScrollbars(0, 0, 0, 0)
-        list_sizer = wx.BoxSizer(wx.VERTICAL)
-
-        # 配置列表 - 支持多选
-        self.config_list = wx.ListCtrl(list_scrolled_window, style=wx.LC_REPORT)
+        # 配置列表 - 支持多选，直接添加到主面板
+        self.config_list = wx.ListCtrl(panel, style=wx.LC_REPORT)
         self.config_list.AppendColumn('配置名称', width=160)
         self.config_list.AppendColumn('模型', width=220)
         self.config_list.AppendColumn('状态', width=80)
         self.config_list.AppendColumn('测试时间', width=80)
         self.config_list.AppendColumn('测试结果', width=320)
-        list_sizer.Add(self.config_list, 1, wx.EXPAND)
-
-        list_scrolled_window.SetSizer(list_sizer)
-        main_sizer.Add(list_scrolled_window, 3, wx.ALL | wx.EXPAND, 10)
+        main_sizer.Add(self.config_list, 3, wx.ALL | wx.EXPAND, 10)
 
         # 配置编辑区域
         edit_box = wx.StaticBox(panel, label="API配置编辑")
@@ -647,25 +639,26 @@ class ConfigManagementFrame(wx.Frame):
         self.env_config_label.SetLabel(env_text)
 
     def adjust_list_height(self):
-        """动态调整配置列表高度"""
+        """动态调整配置列表高度，但不超出合理范围"""
         configs = self.config_manager.get_all_configs()
         count = len(configs)
 
-        # 计算合适的高度：每行约24像素，最少显示3行，最多显示15行
+        # 计算合适的高度：每行约24像素，最少显示3行，最多显示10行
         min_rows = 3
-        max_rows = 15
+        max_rows = 10  # 限制到10行，避免侵占编辑区
         row_height = 24
 
         rows = max(min_rows, min(count, max_rows))
         new_height = rows * row_height
 
-        # 设置列表控件的高度
-        self.config_list.SetMinSize((-1, new_height))
+        # 设置列表控件的固定高度，不再动态调整
+        # 使用固定高度确保布局稳定
+        fixed_height = max_rows * row_height  # 固定为最大高度
+        self.config_list.SetMinSize((-1, fixed_height))
+        self.config_list.SetSize((-1, fixed_height))
 
-        # 如果使用scrolled window，更新滚动条
-        parent = self.config_list.GetParent()
-        if hasattr(parent, 'FitInside'):
-            parent.FitInside()
+        # 刷新父窗口布局
+        self.Layout()
 
     def on_list_motion(self, event):
         """处理列表鼠标移动事件，显示备注工具提示"""

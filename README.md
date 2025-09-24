@@ -255,6 +255,33 @@ ConfigManagementFrame       # 主界面
 - ✅ Claude Code项目自动发现
 - ✅ 项目快速启动功能
 
+## 🔄 Git 协议切换工具
+
+为了方便在 SSH 和 HTTPS 协议之间切换 Git 远程仓库 URL，项目中提供了两个脚本工具：
+
+### PowerShell 脚本 (Windows推荐)
+```
+# 查看当前协议状态
+.\switch_git_protocol.ps1
+
+# 切换到 SSH 协议
+.\switch_git_protocol.ps1 -Protocol ssh
+
+# 切换到 HTTPS 协议
+.\switch_git_protocol.ps1 -Protocol https
+
+# 查看当前协议状态
+.\switch_git_protocol.ps1 -Protocol status
+```
+
+### Python 脚本 (跨平台)
+```
+# 运行脚本并根据提示操作
+python switch_git_protocol.py
+```
+
+这两个脚本可以帮助你快速在 SSH 和 HTTPS 协议之间切换，解决因 SSH 配置问题导致的 Git 操作失败。
+
 ## 🤝 贡献指南
 
 欢迎提交Issue和Pull Request！
