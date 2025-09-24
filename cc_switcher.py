@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-CC-APISwitch v1.1
+CC-APISwitch v1.2
 专业的Claude API配置切换管理工具，支持项目快速启动
 """
 
@@ -428,7 +428,7 @@ class ConfigManagementFrame(wx.Frame):
     """API配置管理主窗口"""
 
     def __init__(self):
-        super().__init__(None, title="CC-APISwitch v1.1", size=(1000, 700))  # 增加窗口宽度
+        super().__init__(None, title="CC-APISwitch v1.2", size=(1050, 700))  # 增加窗口宽度
         self.config_manager = SimpleConfigManager()
         self.selected_index = -1
         self.testing_indices = set()  # 正在测试的配置索引

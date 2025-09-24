@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-CC-APISwitch v1.0 构建脚本
+CC-APISwitch v1.2 构建脚本
 """
 
 import os
@@ -10,18 +10,20 @@ from pathlib import Path
 
 def build_main():
     """构建主版本"""
-    print("开始构建 CC-APISwitch v1.0...")
+    print("开始构建 CC-APISwitch v1.2...")
 
     build_args = [
         "pyinstaller",
         "--onefile",
         "--windowed",
-        "--name=CC-APISwitch",
+        "--name=CC-APISwitch-v1.2",
         "--distpath=dist",
         "--workpath=build",
         "--clean",
         "--optimize=2",
         "--strip",
+        # 添加模型配置文件到打包
+        "--add-data=models_config.json;.",
         # 排除不必要的模块
         "--exclude-module=PIL",
         "--exclude-module=matplotlib",
@@ -39,6 +41,7 @@ def build_main():
         # 必要的隐藏导入
         "--hidden-import=wx._core",
         "--hidden-import=wx._adv",
+        "--hidden-import=wx.adv",
         "--hidden-import=winreg",
         "--hidden-import=requests",
         "--hidden-import=threading",
@@ -46,20 +49,30 @@ def build_main():
         "cc_switcher.py"
     ]
 
-    print(f"构建命令: pyinstaller --onefile --windowed --name=CC-APISwitch ...")
+    print(f"构建命令: pyinstaller --onefile --windowed --name=CC-APISwitch-v1.2 ...")
     result = os.system(" ".join(build_args))
 
     if result == 0:
-        print("\n[SUCCESS] CC-APISwitch v1.0 构建成功!")
+        print("\n[SUCCESS] CC-APISwitch v1.2 构建成功!")
 
         # 检查文件大小
-        main_path = Path("dist/CC-APISwitch.exe")
+        main_path = Path("dist/CC-APISwitch-v1.2.exe")
         if main_path.exists():
             size_mb = main_path.stat().st_size / (1024 * 1024)
             print(f"文件大小: {size_mb:.1f} MB")
             print(f"输出位置: {main_path.absolute()}")
 
+        # 检查模型配置文件
+        models_config = Path("models_config.json")
+        if models_config.exists():
+            print(f"模型配置文件: {models_config.name} (已打包)")
+        else:
+            print("⚠️  警告: 未找到 models_config.json 文件")
+
         print("\n[COMPLETE] 构建完成! 可执行文件已生成到 dist/ 目录")
+        print("📁 发布包内容:")
+        print("   ├── CC-APISwitch-v1.2.exe  (主程序)")
+        print("   └── models_config.json     (已内嵌)")
         return True
     else:
         print("\n[FAILED] 构建失败!")
