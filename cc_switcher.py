@@ -316,6 +316,62 @@ class SimpleConfigManager:
             "claude-3-opus",
             "claude-3-opus-20240229",
 
+            # DeepSeek V3系列模型（2025最新）
+            "deepseek-v3",
+            "deepseek-v3.1",
+            "deepseek-v3-0324",
+            "deepseek-chat",
+            "deepseek-reasoner",
+
+            # Kimi/Moonshot系列模型（2025最新）
+            "kimi-k2",
+            "kimi-k2-instruct",
+            "kimi-k1.5",
+            "moonshot-v1-8k",
+            "moonshot-v1-32k",
+            "moonshot-v1-128k",
+
+            # Qwen3-Coder系列模型（2025最新）
+            "qwen3-coder",
+            "qwen3-coder-plus",
+            "qwen3-coder-plus-2025-07-22",
+            "qwen3-coder-flash",
+            "qwen3-coder-flash-2025-07-28",
+            "qwen3-coder-480b-a35b-instruct",
+
+            # Qwen2.5系列模型
+            "qwen2.5-72b-instruct",
+            "qwen2.5-32b-instruct",
+            "qwen2.5-14b-instruct",
+            "qwen2.5-7b-instruct",
+            "qwen2.5-3b-instruct",
+            "qwen2.5-1.5b-instruct",
+            "qwen2.5-0.5b-instruct",
+            "qwen2-vl-7b-instruct",
+            "qwen2-vl-72b-instruct",
+            "qwencode-plus",
+            "qwencode-turbo",
+
+            # GLM-4和CodeGeeX系列模型（2024-2025最新）
+            "glm-4",
+            "glm-4.5",
+            "glm-4-plus",
+            "glm-4-long",
+            "glm-4-flash",
+            "glm-4-9b-chat",
+            "glm-4v-plus",
+            "glm-4-air",
+            "glm-4-airx",
+            "codegeex4-all-9b",
+
+            # 其他热门模型
+            "gpt-4o",
+            "gpt-4o-mini",
+            "gpt-4-turbo",
+            "gpt-3.5-turbo",
+            "gemini-1.5-pro",
+            "gemini-1.5-flash",
+
             # 简化名称模型
             "claude-sonnet",
             "claude-haiku",
@@ -478,13 +534,16 @@ class ConfigManagementFrame(wx.Frame):
         self.token_text = wx.TextCtrl(panel)
         form_sizer.Add(self.token_text, 1, wx.EXPAND)
 
-        # Model
+        # Model - 改为支持自定义输入的ComboBox
         form_sizer.Add(wx.StaticText(panel, label="默认模型:"), 0, wx.ALIGN_CENTER_VERTICAL)
         models = self.config_manager.get_available_models()
-        self.model_choice = wx.Choice(panel, choices=models)
+        self.model_choice = wx.ComboBox(panel, choices=models, style=wx.CB_DROPDOWN)
         # 设置默认选择为 claude-sonnet-4-20250514
-        default_model_index = models.index("claude-sonnet-4-20250514") if "claude-sonnet-4-20250514" in models else 0
-        self.model_choice.SetSelection(default_model_index)
+        default_model = "claude-sonnet-4-20250514"
+        if default_model in models:
+            self.model_choice.SetValue(default_model)
+        else:
+            self.model_choice.SetSelection(0)
         form_sizer.Add(self.model_choice, 1, wx.EXPAND)
 
         # 备注
@@ -498,15 +557,16 @@ class ConfigManagementFrame(wx.Frame):
         # 操作按钮区域
         btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
-        self.add_btn = wx.Button(panel, label="添加")
-        self.update_btn = wx.Button(panel, label="更新")
-        self.delete_btn = wx.Button(panel, label="删除")
+        # 操作按钮 - 设置较小尺寸
+        self.add_btn = wx.Button(panel, label="添加", size=(60, -1))
+        self.update_btn = wx.Button(panel, label="更新", size=(60, -1))
+        self.delete_btn = wx.Button(panel, label="删除", size=(60, -1))
         self.test_btn = wx.Button(panel, label="测试")
         self.batch_test_btn = wx.Button(panel, label="批量测试")
         self.switch_btn = wx.Button(panel, label="切换配置")
         self.env_btn = wx.Button(panel, label="用户环境变量")
         self.system_env_btn = wx.Button(panel, label="系统环境变量")
-        self.clear_btn = wx.Button(panel, label="清除")
+        self.clear_btn = wx.Button(panel, label="清除", size=(60, -1))
         # 多选和批量操作按钮
         self.select_all_checkbox = wx.CheckBox(panel, label="全选")
         self.move_up_btn = wx.Button(panel, label="上移选中")
@@ -699,7 +759,7 @@ class ConfigManagementFrame(wx.Frame):
         self.name_text.SetValue("")
         self.url_text.SetValue("https://api.anthropic.com")
         self.token_text.SetValue("")
-        self.model_choice.SetSelection(0)
+        self.model_choice.SetValue("")  # 使用SetValue清空ComboBox
         self.note_text.SetValue("")
 
     def load_form(self, config):
@@ -710,9 +770,8 @@ class ConfigManagementFrame(wx.Frame):
         self.note_text.SetValue(config.get("note", ""))
 
         model = config.get("default_model", "")
-        models = self.config_manager.get_available_models()
-        if model in models:
-            self.model_choice.SetSelection(models.index(model))
+        # 直接设置模型值，支持自定义模型
+        self.model_choice.SetValue(model)
 
     def on_select(self, event):
         """选择配置 - 支持多选"""
@@ -743,7 +802,7 @@ class ConfigManagementFrame(wx.Frame):
         name = self.name_text.GetValue().strip()
         url = self.url_text.GetValue().strip()
         token = self.token_text.GetValue().strip()
-        model = self.model_choice.GetStringSelection()
+        model = self.model_choice.GetValue().strip()  # 使用GetValue获取ComboBox的值
         note = self.note_text.GetValue().strip()
 
         if not all([name, url, token, model]):
@@ -780,7 +839,7 @@ class ConfigManagementFrame(wx.Frame):
         name = self.name_text.GetValue().strip()
         url = self.url_text.GetValue().strip()
         token = self.token_text.GetValue().strip()
-        model = self.model_choice.GetStringSelection()
+        model = self.model_choice.GetValue().strip()  # 使用GetValue获取ComboBox的值
         note = self.note_text.GetValue().strip()
 
         if not all([name, url, token, model]):
