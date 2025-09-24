@@ -410,7 +410,7 @@ class ConfigManagementFrame(wx.Frame):
     """API配置管理主窗口"""
 
     def __init__(self):
-        super().__init__(None, title="CC-APISwitch v1.1", size=(900, 700))  # 调整窗口高度
+        super().__init__(None, title="CC-APISwitch v1.1", size=(1000, 700))  # 增加窗口宽度
         self.config_manager = SimpleConfigManager()
         self.selected_index = -1
         self.testing_indices = set()  # 正在测试的配置索引
@@ -438,14 +438,22 @@ class ConfigManagementFrame(wx.Frame):
         self.env_config_label.SetForegroundColour(wx.Colour(0, 100, 200))
         main_sizer.Add(self.env_config_label, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 10)
 
-        # 配置列表 - 多列显示，支持拖动排序
-        self.config_list = wx.ListCtrl(panel, style=wx.LC_REPORT | wx.LC_SINGLE_SEL)
-        self.config_list.AppendColumn('配置名称', width=150)
-        self.config_list.AppendColumn('模型', width=200)
+        # 配置列表区域 - 使用scrolled window支持自适应高度
+        list_scrolled_window = wx.ScrolledWindow(panel)
+        list_scrolled_window.SetScrollbars(0, 0, 0, 0)
+        list_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        # 配置列表 - 支持多选
+        self.config_list = wx.ListCtrl(list_scrolled_window, style=wx.LC_REPORT)
+        self.config_list.AppendColumn('配置名称', width=160)
+        self.config_list.AppendColumn('模型', width=220)
         self.config_list.AppendColumn('状态', width=80)
         self.config_list.AppendColumn('测试时间', width=80)
-        self.config_list.AppendColumn('测试结果', width=300)
-        main_sizer.Add(self.config_list, 3, wx.ALL | wx.EXPAND, 10)
+        self.config_list.AppendColumn('测试结果', width=320)
+        list_sizer.Add(self.config_list, 1, wx.EXPAND)
+
+        list_scrolled_window.SetSizer(list_sizer)
+        main_sizer.Add(list_scrolled_window, 3, wx.ALL | wx.EXPAND, 10)
 
         # 配置编辑区域
         edit_box = wx.StaticBox(panel, label="API配置编辑")
@@ -499,16 +507,21 @@ class ConfigManagementFrame(wx.Frame):
         self.env_btn = wx.Button(panel, label="用户环境变量")
         self.system_env_btn = wx.Button(panel, label="系统环境变量")
         self.clear_btn = wx.Button(panel, label="清除")
-        self.move_up_btn = wx.Button(panel, label="上移")
-        self.move_down_btn = wx.Button(panel, label="下移")
+        # 多选和批量操作按钮
+        self.select_all_checkbox = wx.CheckBox(panel, label="全选")
+        self.move_up_btn = wx.Button(panel, label="上移选中")
+        self.move_down_btn = wx.Button(panel, label="下移选中")
+        self.delete_selected_btn = wx.Button(panel, label="删除选中")
 
         btn_sizer.Add(self.add_btn, 0, wx.ALL, 2)
         btn_sizer.Add(self.update_btn, 0, wx.ALL, 2)
         btn_sizer.Add(self.delete_btn, 0, wx.ALL, 2)
         btn_sizer.Add(self.clear_btn, 0, wx.ALL, 2)
         btn_sizer.AddSpacer(10)
+        btn_sizer.Add(self.select_all_checkbox, 0, wx.ALL, 2)
         btn_sizer.Add(self.move_up_btn, 0, wx.ALL, 2)
         btn_sizer.Add(self.move_down_btn, 0, wx.ALL, 2)
+        btn_sizer.Add(self.delete_selected_btn, 0, wx.ALL, 2)
         btn_sizer.AddSpacer(10)
         btn_sizer.Add(self.test_btn, 0, wx.ALL, 2)
         btn_sizer.Add(self.batch_test_btn, 0, wx.ALL, 2)
@@ -565,8 +578,10 @@ class ConfigManagementFrame(wx.Frame):
         self.update_btn.Bind(wx.EVT_BUTTON, self.on_update)
         self.delete_btn.Bind(wx.EVT_BUTTON, self.on_delete)
         self.clear_btn.Bind(wx.EVT_BUTTON, self.on_clear)  # 绑定清除按钮事件
+        self.select_all_checkbox.Bind(wx.EVT_CHECKBOX, self.on_select_all)
         self.move_up_btn.Bind(wx.EVT_BUTTON, self.on_move_up)
         self.move_down_btn.Bind(wx.EVT_BUTTON, self.on_move_down)
+        self.delete_selected_btn.Bind(wx.EVT_BUTTON, self.on_delete_selected)
         self.test_btn.Bind(wx.EVT_BUTTON, self.on_test)
         self.batch_test_btn.Bind(wx.EVT_BUTTON, self.on_batch_test)
         self.switch_btn.Bind(wx.EVT_BUTTON, self.on_switch)
@@ -600,6 +615,27 @@ class ConfigManagementFrame(wx.Frame):
         env_model = env_config.get('ANTHROPIC_MODEL', '未设置')
         env_text = f"系统环境变量: {env_url} | {env_model}"
         self.env_config_label.SetLabel(env_text)
+
+    def adjust_list_height(self):
+        """动态调整配置列表高度"""
+        configs = self.config_manager.get_all_configs()
+        count = len(configs)
+
+        # 计算合适的高度：每行约24像素，最少显示3行，最多显示15行
+        min_rows = 3
+        max_rows = 15
+        row_height = 24
+
+        rows = max(min_rows, min(count, max_rows))
+        new_height = rows * row_height
+
+        # 设置列表控件的高度
+        self.config_list.SetMinSize((-1, new_height))
+
+        # 如果使用scrolled window，更新滚动条
+        parent = self.config_list.GetParent()
+        if hasattr(parent, 'FitInside'):
+            parent.FitInside()
 
     def on_list_motion(self, event):
         """处理列表鼠标移动事件，显示备注工具提示"""
@@ -655,6 +691,9 @@ class ConfigManagementFrame(wx.Frame):
             elif status in ["失败", "错误", "超时"]:
                 self.config_list.SetItemTextColour(index, wx.Colour(200, 0, 0))  # 红色-失败
 
+        # 调整列表高度
+        self.adjust_list_height()
+
     def clear_form(self):
         """清空表单"""
         self.name_text.SetValue("")
@@ -676,13 +715,27 @@ class ConfigManagementFrame(wx.Frame):
             self.model_choice.SetSelection(models.index(model))
 
     def on_select(self, event):
-        """选择配置"""
-        self.selected_index = event.GetIndex()
-        if self.selected_index >= 0:
+        """选择配置 - 支持多选"""
+        selected_items = self.get_selected_indices()
+
+        if len(selected_items) == 1:
+            # 单选时加载配置到编辑区
+            self.selected_index = selected_items[0]
             configs = self.config_manager.get_all_configs()
             if self.selected_index < len(configs):
                 self.load_form(configs[self.selected_index])
                 self.status_text.SetLabel(f"已选择配置: {configs[self.selected_index]['name']}")
+        elif len(selected_items) > 1:
+            # 多选时不加载配置到编辑区
+            self.selected_index = selected_items[0]  # 保持第一个选中项
+            self.status_text.SetLabel(f"已选择 {len(selected_items)} 个配置")
+
+        # 更新全选复选框状态
+        configs = self.config_manager.get_all_configs()
+        if selected_items and len(selected_items) == len(configs):
+            self.select_all_checkbox.SetValue(True)
+        else:
+            self.select_all_checkbox.SetValue(False)
 
     def on_add(self, event):
         """添加配置 - 直接保存配置内容"""
@@ -1000,55 +1053,144 @@ start "{window_title}" powershell -NoExit -Command "{claude_command}"
         """启动Claude -c命令"""
         self.launch_claude_with_mode(use_c_flag=True)
 
+    
+    def on_select_all(self, event):
+        """全选/取消全选"""
+        is_checked = event.IsChecked()
+        configs = self.config_manager.get_all_configs()
+
+        for i in range(len(configs)):
+            if is_checked:
+                self.config_list.Select(i, True)
+            else:
+                self.config_list.Select(i, False)
+
+        if is_checked:
+            self.status_text.SetLabel(f"已全选 {len(configs)} 个配置")
+        else:
+            self.status_text.SetLabel("已取消全选")
+
+    def get_selected_indices(self):
+        """获取所有选中的索引"""
+        selected = []
+        for i in range(self.config_list.GetItemCount()):
+            if self.config_list.IsSelected(i):
+                selected.append(i)
+        return selected
+
     def on_move_up(self, event):
-        """上移配置"""
-        if self.selected_index < 0:
-            wx.MessageBox("请先选择一个配置", "提示", wx.OK | wx.ICON_INFORMATION)
+        """上移选中的配置"""
+        selected_indices = self.get_selected_indices()
+        if not selected_indices:
+            wx.MessageBox("请先选择要移动的配置", "提示", wx.OK | wx.ICON_INFORMATION)
             return
 
         configs = self.config_manager.get_all_configs()
-        if self.selected_index > 0:
-            # 交换配置
-            configs[self.selected_index], configs[self.selected_index - 1] = configs[self.selected_index - 1], configs[self.selected_index]
+        moved_configs = []
 
+        # 从后往前处理，避免索引变化
+        for index in sorted(selected_indices, reverse=True):
+            if index > 0:
+                # 交换配置
+                configs[index], configs[index - 1] = configs[index - 1], configs[index]
+                moved_configs.append(configs[index]['name'])
+
+        if moved_configs:
             # 更新配置数据
             self.config_manager.configs_data["configs"] = configs
             self.config_manager.save_configs_data()
 
-            # 刷新列表
+            # 刷新列表并重新选中
             self.refresh_list()
-
-            # 更新选中状态
-            self.selected_index -= 1
-            self.config_list.Select(self.selected_index, True)
+            for i in range(len(selected_indices)):
+                if selected_indices[i] > 0:
+                    self.config_list.Select(selected_indices[i] - 1, True)
 
             # 状态提示
-            self.status_text.SetLabel(f"已上移配置: {configs[self.selected_index]['name']}")
+            if len(moved_configs) == 1:
+                self.status_text.SetLabel(f"已上移配置: {moved_configs[0]}")
+            else:
+                self.status_text.SetLabel(f"已上移 {len(moved_configs)} 个配置")
+        else:
+            wx.MessageBox("选中的配置已经在最顶部，无法上移", "提示", wx.OK | wx.ICON_INFORMATION)
 
     def on_move_down(self, event):
-        """下移配置"""
-        if self.selected_index < 0:
-            wx.MessageBox("请先选择一个配置", "提示", wx.OK | wx.ICON_INFORMATION)
+        """下移选中的配置"""
+        selected_indices = self.get_selected_indices()
+        if not selected_indices:
+            wx.MessageBox("请先选择要移动的配置", "提示", wx.OK | wx.ICON_INFORMATION)
             return
 
         configs = self.config_manager.get_all_configs()
-        if self.selected_index < len(configs) - 1:
-            # 交换配置
-            configs[self.selected_index], configs[self.selected_index + 1] = configs[self.selected_index + 1], configs[self.selected_index]
+        moved_configs = []
+
+        # 从前往后处理，避免索引变化
+        for index in sorted(selected_indices):
+            if index < len(configs) - 1:
+                # 交换配置
+                configs[index], configs[index + 1] = configs[index + 1], configs[index]
+                moved_configs.append(configs[index]['name'])
+
+        if moved_configs:
+            # 更新配置数据
+            self.config_manager.configs_data["configs"] = configs
+            self.config_manager.save_configs_data()
+
+            # 刷新列表并重新选中
+            self.refresh_list()
+            for i in range(len(selected_indices)):
+                if selected_indices[i] < len(configs) - 1:
+                    self.config_list.Select(selected_indices[i] + 1, True)
+
+            # 状态提示
+            if len(moved_configs) == 1:
+                self.status_text.SetLabel(f"已下移配置: {moved_configs[0]}")
+            else:
+                self.status_text.SetLabel(f"已下移 {len(moved_configs)} 个配置")
+        else:
+            wx.MessageBox("选中的配置已经在最底部，无法下移", "提示", wx.OK | wx.ICON_INFORMATION)
+
+    def on_delete_selected(self, event):
+        """删除选中的配置"""
+        selected_indices = self.get_selected_indices()
+        if not selected_indices:
+            wx.MessageBox("请先选择要删除的配置", "提示", wx.OK | wx.ICON_INFORMATION)
+            return
+
+        configs = self.config_manager.get_all_configs()
+        if len(selected_indices) == 1:
+            config_name = configs[selected_indices[0]]['name']
+            message = f"确定删除配置 '{config_name}' 吗？"
+        else:
+            message = f"确定删除选中的 {len(selected_indices)} 个配置吗？"
+
+        if wx.MessageBox(message, "确认删除", wx.YES_NO | wx.ICON_QUESTION) == wx.YES:
+            # 从后往前删除，避免索引变化
+            for index in sorted(selected_indices, reverse=True):
+                if index < len(configs):
+                    config_name = configs[index]['name']
+                    del configs[index]
+
+                    # 如果删除的是活跃配置，清除活跃配置
+                    if self.config_manager.configs_data.get("active_config") == config_name:
+                        self.config_manager.configs_data["active_config"] = None
 
             # 更新配置数据
             self.config_manager.configs_data["configs"] = configs
             self.config_manager.save_configs_data()
 
+            # 清空表单和选中状态
+            self.clear_form()
+            self.selected_index = -1
+
             # 刷新列表
             self.refresh_list()
 
-            # 更新选中状态
-            self.selected_index += 1
-            self.config_list.Select(self.selected_index, True)
-
             # 状态提示
-            self.status_text.SetLabel(f"已下移配置: {configs[self.selected_index]['name']}")
+            if len(selected_indices) == 1:
+                self.status_text.SetLabel("配置删除成功")
+            else:
+                self.status_text.SetLabel(f"已删除 {len(selected_indices)} 个配置")
 
 
 class SimpleApp(wx.App):
