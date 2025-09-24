@@ -297,86 +297,47 @@ class SimpleConfigManager:
         return env_config
 
     def get_available_models(self):
-        """获取可用模型列表"""
+        """获取可用模型列表 - 从配置文件读取"""
+        try:
+            # 获取当前脚本所在目录
+            current_dir = Path(__file__).parent.absolute()
+            models_config_file = current_dir / "models_config.json"
+
+            # 尝试读取模型配置文件
+            if models_config_file.exists():
+                with open(models_config_file, 'r', encoding='utf-8') as f:
+                    models_config = json.load(f)
+
+                # 提取所有模型到一个扁平列表
+                all_models = []
+                for category in models_config.get("models", []):
+                    all_models.extend(category.get("models", []))
+
+                return all_models
+        except Exception as e:
+            print(f"读取模型配置文件失败: {e}")
+
+        # 如果读取失败，返回默认模型列表
         return [
             # Claude 4系列模型
             "claude-4-sonnet",
             "claude-sonnet-4-20250514",
 
-            # Claude 3.7系列模型
-            "claude-3-7-sonnet",
-            "claude-3-7-sonnet-20250219",
-
             # Claude 3.5系列模型
             "claude-3-5-sonnet",
-            "claude-3-5-sonnet-20241022",
             "claude-3-5-haiku",
-            "claude-3-5-haiku-20241022",
 
-            # Claude 3系列模型
-            "claude-3-opus",
-            "claude-3-opus-20240229",
-
-            # DeepSeek V3系列模型（2025最新）
+            # DeepSeek系列模型
             "deepseek-v3",
-            "deepseek-v3.1",
-            "deepseek-v3-0324",
             "deepseek-chat",
-            "deepseek-reasoner",
 
-            # Kimi/Moonshot系列模型（2025最新）
-            "kimi-k2",
-            "kimi-k2-instruct",
-            "kimi-k1.5",
-            "moonshot-v1-8k",
-            "moonshot-v1-32k",
-            "moonshot-v1-128k",
-
-            # Qwen3-Coder系列模型（2025最新）
-            "qwen3-coder",
-            "qwen3-coder-plus",
-            "qwen3-coder-plus-2025-07-22",
-            "qwen3-coder-flash",
-            "qwen3-coder-flash-2025-07-28",
-            "qwen3-coder-480b-a35b-instruct",
-
-            # Qwen2.5系列模型
-            "qwen2.5-72b-instruct",
-            "qwen2.5-32b-instruct",
-            "qwen2.5-14b-instruct",
-            "qwen2.5-7b-instruct",
-            "qwen2.5-3b-instruct",
-            "qwen2.5-1.5b-instruct",
-            "qwen2.5-0.5b-instruct",
-            "qwen2-vl-7b-instruct",
-            "qwen2-vl-72b-instruct",
-            "qwencode-plus",
-            "qwencode-turbo",
-
-            # GLM-4和CodeGeeX系列模型（2024-2025最新）
-            "glm-4",
-            "glm-4.5",
-            "glm-4-plus",
-            "glm-4-long",
-            "glm-4-flash",
-            "glm-4-9b-chat",
-            "glm-4v-plus",
-            "glm-4-air",
-            "glm-4-airx",
-            "codegeex4-all-9b",
-
-            # 其他热门模型
+            # 其他常用模型
             "gpt-4o",
-            "gpt-4o-mini",
-            "gpt-4-turbo",
-            "gpt-3.5-turbo",
             "gemini-1.5-pro",
-            "gemini-1.5-flash",
 
             # 简化名称模型
             "claude-sonnet",
-            "claude-haiku",
-            "claude-opus"
+            "claude-haiku"
         ]
 
     def get_claude_code_projects(self):
@@ -1268,8 +1229,9 @@ start "{window_title}" powershell -NoExit -Command "{claude_command}"
             date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_filename = f"cc_apiswitch_configs_backup_{date_str}.json"
 
-            # 备份文件路径
-            backup_path = self.config_manager.claude_dir / backup_filename
+            # 备份文件路径 - 当前软件运行位置
+            current_dir = Path(__file__).parent.absolute()
+            backup_path = current_dir / backup_filename
 
             # 复制配置文件
             if self.config_manager.configs_file.exists():
