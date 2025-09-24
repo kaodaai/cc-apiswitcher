@@ -6,6 +6,7 @@ CC-APISwitch v1.1
 """
 
 import wx
+import wx.adv
 import os
 import json
 import shutil
@@ -612,20 +613,25 @@ class ConfigManagementFrame(wx.Frame):
 
         main_sizer.Add(project_sizer, 0, wx.ALL | wx.EXPAND, 10)
 
-        # 底部状态栏和版权信息区域（同一行）
+        # 底部状态栏、备份按钮和版权信息区域（同一行）
         bottom_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         # 左侧状态信息
         self.status_text = wx.StaticText(panel, label="就绪")
         bottom_sizer.Add(self.status_text, 1, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 10)
 
-        # 右侧版权信息
-        bottom_sizer.AddStretchSpacer()
-        copyright_text = wx.StaticText(panel, label="by: kaodaai")
+        # 中间备份按钮
+        self.backup_btn = wx.Button(panel, label="备份配置", size=(80, -1))
+        bottom_sizer.Add(self.backup_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+
+        # 右侧版权信息 - 改为可点击的链接
+        self.copyright_link = wx.adv.HyperlinkCtrl(panel, wx.ID_ANY, "by: kaodaai", "https://github.com/kaodaai/cc-apiswitcher")
         copyright_font = wx.Font(8, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
-        copyright_text.SetFont(copyright_font)
-        copyright_text.SetForegroundColour(wx.Colour(128, 128, 128))  # 灰色
-        bottom_sizer.Add(copyright_text, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
+        self.copyright_link.SetFont(copyright_font)
+        self.copyright_link.SetHoverColour(wx.Colour(0, 100, 200))  # 悬停时蓝色
+        self.copyright_link.SetNormalColour(wx.Colour(128, 128, 128))  # 正常时灰色
+        self.copyright_link.SetVisitedColour(wx.Colour(128, 128, 128))  # 访问后灰色
+        bottom_sizer.Add(self.copyright_link, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
 
         main_sizer.Add(bottom_sizer, 0, wx.EXPAND | wx.BOTTOM, 5)
 
@@ -652,6 +658,9 @@ class ConfigManagementFrame(wx.Frame):
         self.refresh_project_btn.Bind(wx.EVT_BUTTON, self.on_refresh_projects)
         self.open_claude_btn.Bind(wx.EVT_BUTTON, self.on_open_claude)
         self.open_claude_c_btn.Bind(wx.EVT_BUTTON, self.on_open_claude_c)
+
+        # 备份按钮事件绑定
+        self.backup_btn.Bind(wx.EVT_BUTTON, self.on_backup_config)
 
         self.update_config_display()
         self.refresh_projects()  # 初始化项目列表
@@ -1250,6 +1259,28 @@ start "{window_title}" powershell -NoExit -Command "{claude_command}"
                 self.status_text.SetLabel("配置删除成功")
             else:
                 self.status_text.SetLabel(f"已删除 {len(selected_indices)} 个配置")
+
+    def on_backup_config(self, event):
+        """备份配置文件"""
+        try:
+            # 生成带日期的备份文件名
+            from datetime import datetime
+            date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_filename = f"cc_apiswitch_configs_backup_{date_str}.json"
+
+            # 备份文件路径
+            backup_path = self.config_manager.claude_dir / backup_filename
+
+            # 复制配置文件
+            if self.config_manager.configs_file.exists():
+                shutil.copy2(self.config_manager.configs_file, backup_path)
+                self.status_text.SetLabel(f"配置已备份至: {backup_filename}")
+                wx.MessageBox(f"配置已成功备份至:\n{backup_path}", "备份成功", wx.OK | wx.ICON_INFORMATION)
+            else:
+                wx.MessageBox("没有找到配置文件，无法备份", "提示", wx.OK | wx.ICON_WARNING)
+        except Exception as e:
+            self.status_text.SetLabel(f"备份失败: {str(e)}")
+            wx.MessageBox(f"备份失败: {str(e)}", "错误", wx.OK | wx.ICON_ERROR)
 
 
 class SimpleApp(wx.App):
