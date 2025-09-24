@@ -438,7 +438,7 @@ class ConfigManagementFrame(wx.Frame):
         self.env_config_label.SetForegroundColour(wx.Colour(0, 100, 200))
         main_sizer.Add(self.env_config_label, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 10)
 
-        # 配置列表 - 多列显示
+        # 配置列表 - 多列显示，支持拖动排序
         self.config_list = wx.ListCtrl(panel, style=wx.LC_REPORT | wx.LC_SINGLE_SEL)
         self.config_list.AppendColumn('配置名称', width=150)
         self.config_list.AppendColumn('模型', width=200)
@@ -467,7 +467,7 @@ class ConfigManagementFrame(wx.Frame):
 
         # Token
         form_sizer.Add(wx.StaticText(panel, label="认证令牌:"), 0, wx.ALIGN_CENTER_VERTICAL)
-        self.token_text = wx.TextCtrl(panel, style=wx.TE_PASSWORD)
+        self.token_text = wx.TextCtrl(panel)
         form_sizer.Add(self.token_text, 1, wx.EXPAND)
 
         # Model
@@ -485,7 +485,7 @@ class ConfigManagementFrame(wx.Frame):
         form_sizer.Add(self.note_text, 1, wx.EXPAND)
 
         edit_sizer.Add(form_sizer, 0, wx.ALL | wx.EXPAND, 10)
-        main_sizer.Add(edit_sizer, 2, wx.ALL | wx.EXPAND, 10)  # 减少编辑区域的垂直比例
+        main_sizer.Add(edit_sizer, 0, wx.ALL | wx.EXPAND, 10)
 
         # 操作按钮区域
         btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -499,11 +499,16 @@ class ConfigManagementFrame(wx.Frame):
         self.env_btn = wx.Button(panel, label="用户环境变量")
         self.system_env_btn = wx.Button(panel, label="系统环境变量")
         self.clear_btn = wx.Button(panel, label="清除")
+        self.move_up_btn = wx.Button(panel, label="上移")
+        self.move_down_btn = wx.Button(panel, label="下移")
 
         btn_sizer.Add(self.add_btn, 0, wx.ALL, 2)
         btn_sizer.Add(self.update_btn, 0, wx.ALL, 2)
         btn_sizer.Add(self.delete_btn, 0, wx.ALL, 2)
         btn_sizer.Add(self.clear_btn, 0, wx.ALL, 2)
+        btn_sizer.AddSpacer(10)
+        btn_sizer.Add(self.move_up_btn, 0, wx.ALL, 2)
+        btn_sizer.Add(self.move_down_btn, 0, wx.ALL, 2)
         btn_sizer.AddSpacer(10)
         btn_sizer.Add(self.test_btn, 0, wx.ALL, 2)
         btn_sizer.Add(self.batch_test_btn, 0, wx.ALL, 2)
@@ -560,6 +565,8 @@ class ConfigManagementFrame(wx.Frame):
         self.update_btn.Bind(wx.EVT_BUTTON, self.on_update)
         self.delete_btn.Bind(wx.EVT_BUTTON, self.on_delete)
         self.clear_btn.Bind(wx.EVT_BUTTON, self.on_clear)  # 绑定清除按钮事件
+        self.move_up_btn.Bind(wx.EVT_BUTTON, self.on_move_up)
+        self.move_down_btn.Bind(wx.EVT_BUTTON, self.on_move_down)
         self.test_btn.Bind(wx.EVT_BUTTON, self.on_test)
         self.batch_test_btn.Bind(wx.EVT_BUTTON, self.on_batch_test)
         self.switch_btn.Bind(wx.EVT_BUTTON, self.on_switch)
@@ -992,6 +999,56 @@ start "{window_title}" powershell -NoExit -Command "{claude_command}"
     def on_open_claude_c(self, event):
         """启动Claude -c命令"""
         self.launch_claude_with_mode(use_c_flag=True)
+
+    def on_move_up(self, event):
+        """上移配置"""
+        if self.selected_index < 0:
+            wx.MessageBox("请先选择一个配置", "提示", wx.OK | wx.ICON_INFORMATION)
+            return
+
+        configs = self.config_manager.get_all_configs()
+        if self.selected_index > 0:
+            # 交换配置
+            configs[self.selected_index], configs[self.selected_index - 1] = configs[self.selected_index - 1], configs[self.selected_index]
+
+            # 更新配置数据
+            self.config_manager.configs_data["configs"] = configs
+            self.config_manager.save_configs_data()
+
+            # 刷新列表
+            self.refresh_list()
+
+            # 更新选中状态
+            self.selected_index -= 1
+            self.config_list.Select(self.selected_index, True)
+
+            # 状态提示
+            self.status_text.SetLabel(f"已上移配置: {configs[self.selected_index]['name']}")
+
+    def on_move_down(self, event):
+        """下移配置"""
+        if self.selected_index < 0:
+            wx.MessageBox("请先选择一个配置", "提示", wx.OK | wx.ICON_INFORMATION)
+            return
+
+        configs = self.config_manager.get_all_configs()
+        if self.selected_index < len(configs) - 1:
+            # 交换配置
+            configs[self.selected_index], configs[self.selected_index + 1] = configs[self.selected_index + 1], configs[self.selected_index]
+
+            # 更新配置数据
+            self.config_manager.configs_data["configs"] = configs
+            self.config_manager.save_configs_data()
+
+            # 刷新列表
+            self.refresh_list()
+
+            # 更新选中状态
+            self.selected_index += 1
+            self.config_list.Select(self.selected_index, True)
+
+            # 状态提示
+            self.status_text.SetLabel(f"已下移配置: {configs[self.selected_index]['name']}")
 
 
 class SimpleApp(wx.App):
